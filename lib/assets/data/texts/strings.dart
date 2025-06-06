@@ -1,6 +1,6 @@
 class AppStrings {
   //INTERFACE
-  static const String nameAppString = 'NeuroOrto.pro';
+  static const String nameAppString = 'NeuroOrto.control';
   static const String versionString = 'Версия: 0.23.17';
 
   //all

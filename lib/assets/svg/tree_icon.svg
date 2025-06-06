@@ -1,0 +1,13 @@
+<svg width="315" height="377" viewBox="0 0 315 377" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Ствол -->
+    <line fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="12" x1="157.5" x2="157.5" y1="342" y2="129"/>
+
+    <!-- Левая ветка -->
+    <line fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="12" x1="157.5" x2="98.5" y1="223" y2="188"/>
+
+    <!-- Правая ветка -->
+    <line fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="12" x1="157.5" x2="216.5" y1="188" y2="153"/>
+
+    <!-- Трилистник крона -->
+    <path d="M163.6,266.8A79.4,79.4,0,1,0,241.4,102.7a10.7,10.7,0,0,1-5-5.2,84.4,84.4,0,0,0-155.8,0,10.7,10.7,0,0,1-5,5.2,79.4,79.4,0,1,0,77.2,138.1A10.2,10.2,0,0,1,163.6,266.8Z" fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+</svg>

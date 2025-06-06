@@ -69,10 +69,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildButton(
                           context,
                           AppStrings.buttonStartTreeString,
-                          'lib/assets/svg/xray_icon.svg',
+                          'lib/assets/svg/tree_icon.svg',
                           buttonSize,
                           onPressed: () {
-                            _showPlaceholderDialog(context, 'Скрининг');
+                            _showPlaceholderDialog(context, 'Дерево');
                           },
                         ),
                       ],
