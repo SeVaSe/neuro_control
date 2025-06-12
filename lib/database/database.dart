@@ -187,6 +187,7 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
     await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
     await _insertInitialReferenceGuides(db);
+    await _insertInitialInstructions(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -260,6 +261,43 @@ class AppDatabase {
 
     for (final guide in guides) {
       batch.insert('reference_guide', guide);
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> _insertInitialInstructions(Database db) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final guides = [
+      {
+        'title': 'Домашнее окно',
+        'description': 'В главном окне у нас есть...',
+        'category': 'Главное',
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'title': 'Раздел "О программе"',
+        'description': 'Можно узнать все о...',
+        'category': 'Разделы',
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'title': 'Раздел "Справочник"',
+        'description': 'Узнайте о медицинских паталогиях больше...',
+        'category': 'Разделы',
+        'created_at': now,
+        'updated_at': now,
+      },
+      // Добавь другие записи при необходимости
+    ];
+
+    final batch = db.batch();
+
+    for (final guide in guides) {
+      batch.insert('operation_manual', guide);
     }
 
     await batch.commit(noResult: true);

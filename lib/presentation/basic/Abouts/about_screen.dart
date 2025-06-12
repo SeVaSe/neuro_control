@@ -3,6 +3,7 @@ import 'package:flutter/services.dart'; // Для загрузки JSON из ass
 import '../../../assets/colors/app_colors.dart';
 import '../../../assets/data/texts/strings.dart';
 import 'autors_page.dart';
+import 'instruction_page.dart';
 
 
 class AboutProgram extends StatefulWidget {
@@ -104,7 +105,7 @@ class _AboutProgramState extends State<AboutProgram> {
                 Icons.format_list_bulleted_sharp,
                 screenHeight,
                 screenWidth,
-                null
+                OperationManualScreen()
             ),
             _buildButton(
                 AppStrings.buttonStorageAboutString,
