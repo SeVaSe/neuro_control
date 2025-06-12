@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Для загрузки JSON из assets
-import '../../../assets/colors/app_colors.dart';
-import '../../../assets/data/texts/strings.dart';
-import 'autors_page.dart';
-import 'instruction_page.dart';
+import '../../assets/colors/app_colors.dart';
+import '../../assets/data/texts/strings.dart';
+import '../pages/Abouts/autors_page.dart';
+import '../pages/Abouts/instruction_page.dart';
 
 
 class AboutProgram extends StatefulWidget {

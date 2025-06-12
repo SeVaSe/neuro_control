@@ -5,7 +5,7 @@ import '../../assets/colors/app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'manual_screen.dart';
 import '../widgets/FirstLaunchDialog.dart';
-import 'Abouts/about_screen.dart';
+import 'about_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
