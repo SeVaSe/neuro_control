@@ -3,8 +3,9 @@ import 'package:flutter_svg/svg.dart';
 import '../../assets/data/texts/strings.dart';
 import '../../assets/colors/app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'manual_screen.dart';
 import '../widgets/FirstLaunchDialog.dart';
+import 'Abouts/about_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -88,7 +89,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           'lib/assets/svg/manual_icon.svg',
                           buttonSize,
                           onPressed: () {
-                            _showPlaceholderDialog(context, 'Руководство');
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ManualScreen(),
+                              ),
+                            );
                           },
                         ),
                         _buildOutlinedButton(
@@ -97,7 +103,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           'lib/assets/svg/about_icon.svg',
                           buttonSize,
                           onPressed: () {
-                            _showPlaceholderDialog(context, 'О программе');
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AboutProgram(),
+                              ),
+                            );
                           },
                         ),
                       ],

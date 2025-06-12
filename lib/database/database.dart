@@ -186,6 +186,7 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_reference_images_guide ON reference_guide_images(reference_guide_id)');
     await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
     await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
+    await _insertInitialReferenceGuides(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -226,6 +227,44 @@ class AppDatabase {
       await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
     }
   }
+
+  Future<void> _insertInitialReferenceGuides(Database db) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final guides = [
+      {
+        'title': 'Что такое ДЦП?',
+        'content': 'Детский церебральный паралич — это группа двигательных нарушений...',
+        'category': 'Общие сведения',
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'title': 'Методы реабилитации при ДЦП',
+        'content': 'Включают ЛФК, робототерапию, физиотерапию, и ортезирование.',
+        'category': 'Реабилитация',
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'title': 'Роль ортопедии в нейроразвитии',
+        'content': 'Ортопедические методы важны для контроля за формированием скелета и осанки.',
+        'category': 'Ортопедия',
+        'created_at': now,
+        'updated_at': now,
+      },
+      // Добавь другие записи при необходимости
+    ];
+
+    final batch = db.batch();
+
+    for (final guide in guides) {
+      batch.insert('reference_guide', guide);
+    }
+
+    await batch.commit(noResult: true);
+  }
+
 
 // Отдельный метод для закрытия БД
   Future<void> close() async {
