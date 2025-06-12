@@ -20,7 +20,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -108,6 +108,70 @@ class AppDatabase {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE motor_skills_calendar (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT NOT NULL,
+        skill_date INTEGER NOT NULL,
+        skill_description TEXT NOT NULL,
+        notes TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
+
+    // Таблица справочника
+    await db.execute('''
+      CREATE TABLE reference_guide (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
+    // Таблица фотографий для справочника
+    await db.execute('''
+      CREATE TABLE reference_guide_images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reference_guide_id INTEGER NOT NULL,
+        image_path TEXT NOT NULL,
+        description TEXT,
+        order_index INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (reference_guide_id) REFERENCES reference_guide (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Таблица инструкций по эксплуатации
+    await db.execute('''
+      CREATE TABLE operation_manual (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        category TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
+    // Таблица фотографий для инструкций
+    await db.execute('''
+      CREATE TABLE operation_manual_images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        operation_manual_id INTEGER NOT NULL,
+        image_path TEXT NOT NULL,
+        description TEXT,
+        order_index INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (operation_manual_id) REFERENCES operation_manual (id) ON DELETE CASCADE
+      )
+    ''');
+
+
     // Индексы для оптимизации запросов
     await db.execute('CREATE INDEX idx_orthopedic_patient ON orthopedic_examinations(patient_id)');
     await db.execute('CREATE INDEX idx_xray_images_exam ON xray_images(orthopedic_examination_id)');
@@ -116,10 +180,32 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_densitometry_patient ON densitometry(patient_id)');
     await db.execute('CREATE INDEX idx_salivation_patient ON salivation(patient_id)');
     await db.execute('CREATE INDEX idx_gmfcs_patient ON gmfcs(patient_id)');
+    await db.execute('CREATE INDEX idx_motor_skills_patient ON motor_skills_calendar(patient_id)');
+    await db.execute('CREATE INDEX idx_motor_skills_date ON motor_skills_calendar(skill_date)');
+    await db.execute('CREATE INDEX idx_reference_guide_category ON reference_guide(category)');
+    await db.execute('CREATE INDEX idx_reference_images_guide ON reference_guide_images(reference_guide_id)');
+    await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
+    await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Здесь будут миграции при обновлении схемы БД
+    if (oldVersion < 2) {
+      // Добавляем таблицу календаря моторных навыков
+      await db.execute('''
+      CREATE TABLE motor_skills_calendar (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT NOT NULL,
+        skill_date INTEGER NOT NULL,
+        skill_description TEXT NOT NULL,
+        notes TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
+      await db.execute('CREATE INDEX idx_motor_skills_patient ON motor_skills_calendar(patient_id)');
+      await db.execute('CREATE INDEX idx_motor_skills_date ON motor_skills_calendar(skill_date)');
+    }
   }
 
   Future<void> close() async {
