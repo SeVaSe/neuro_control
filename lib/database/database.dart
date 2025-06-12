@@ -202,19 +202,39 @@ class AppDatabase {
         updated_at INTEGER NOT NULL
       )
     ''');
+    }
 
+    if (oldVersion < 3) {
+      // Добавляем таблицу справочника
+      await db.execute('''
+      CREATE TABLE reference_guide (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
+      // Индексы для производительности
       await db.execute('CREATE INDEX idx_motor_skills_patient ON motor_skills_calendar(patient_id)');
       await db.execute('CREATE INDEX idx_motor_skills_date ON motor_skills_calendar(skill_date)');
+      await db.execute('CREATE INDEX idx_reference_guide_category ON reference_guide(category)');
+      await db.execute('CREATE INDEX idx_reference_images_guide ON reference_guide_images(reference_guide_id)');
+      await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
+      await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
     }
   }
 
+// Отдельный метод для закрытия БД
   Future<void> close() async {
     final db = await database;
     await db.close();
     _database = null;
   }
 
-  // Метод для очистки БД (для разработки)
+// Метод для удаления БД (например, при сбросе или разработке)
   Future<void> deleteDatabase() async {
     final databasePath = await getDatabasesPath();
     final path = join(databasePath, 'medical_app.db');
