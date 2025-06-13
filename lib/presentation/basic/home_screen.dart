@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'manual_screen.dart';
 import '../widgets/FirstLaunchDialog.dart';
 import 'about_screen.dart';
+import 'menu_diagnostics.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -70,10 +71,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildButton(
                           context,
                           AppStrings.buttonStartTreeString,
-                          'lib/assets/svg/diagnostic_icon.svg',
+                          'lib/assets/svg/tree_icon.svg',
                           buttonSize,
                           onPressed: () {
-                            _showPlaceholderDialog(context, 'Диагностика');
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => MenuPage(),
+                              ),
+                            );
                           },
                         ),
                       ],
