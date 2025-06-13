@@ -10,8 +10,8 @@ class AppStrings {
   static const String buttonSpravkaString = 'Справка';
 
   //home
-  static const String buttonStartPhotoString = 'Фото обращение';
-  static const String buttonStartTreeString = 'Дерево';
+  static const String buttonStartPhotoString = 'КМН';
+  static const String buttonStartTreeString = 'Диагностика';
   static const String buttonStartManualString = 'Справочник';
   static const String buttonStartAboutString = 'О программе';
 

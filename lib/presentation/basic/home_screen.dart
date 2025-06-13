@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'manual_screen.dart';
 import '../widgets/FirstLaunchDialog.dart';
 import 'about_screen.dart';
-import 'tree_diagnostic_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -62,24 +61,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildButton(
                           context,
                           AppStrings.buttonStartPhotoString,
-                          'lib/assets/svg/diagnostic_icon.svg',
+                          'lib/assets/svg/calendar_exp_icon.svg',
                           buttonSize,
                           onPressed: () {
-                            _showPlaceholderDialog(context, 'Диагностика');
+                            _showPlaceholderDialog(context, 'Календарь моторных навыков');
                           },
                         ),
                         _buildButton(
                           context,
                           AppStrings.buttonStartTreeString,
-                          'lib/assets/svg/tree_icon.svg',
+                          'lib/assets/svg/diagnostic_icon.svg',
                           buttonSize,
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TreeDiagnosticScreen(),
-                              ),
-                            );
+                            _showPlaceholderDialog(context, 'Диагностика');
                           },
                         ),
                       ],
