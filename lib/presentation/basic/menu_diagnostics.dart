@@ -85,7 +85,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           color: AppColors.thirdColor,
         ),
         title: const Text(
-          AppStrings.buttonStartAboutString,
+          AppStrings.buttonStartTreeString,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontFamily: 'TinosBold',
@@ -119,17 +119,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Медицинские услуги',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.thirdColor,
-                          fontFamily: 'TinosBold',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Выберите необходимую услугу для записи',
+                        'Выберите подходящую диагностику для вас',
                         style: TextStyle(
                           fontSize: 16,
                           color: AppColors.thirdColor.withOpacity(0.8),
@@ -158,7 +148,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           parent: _animationController,
                           curve: Interval(
                             index * 0.1,
-                            0.7 + (index * 0.1),
+                            (0.7 + index * 0.1).clamp(0.0, 1.0),
                             curve: Curves.easeOutCubic,
                           ),
                         ));
@@ -170,7 +160,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           parent: _animationController,
                           curve: Interval(
                             index * 0.1,
-                            0.7 + (index * 0.1),
+                            (0.7 + index * 0.1).clamp(0.0, 1.0),
                             curve: Curves.easeOut,
                           ),
                         ));
