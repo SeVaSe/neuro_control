@@ -96,17 +96,14 @@ class AppDatabase {
       )
     ''');
 
-    // Таблица GMFCS
+    // Таблица GMFCS — хранит только текущее значение уровня
     await db.execute('''
       CREATE TABLE gmfcs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        patient_id TEXT NOT NULL,
-        level INTEGER NOT NULL CHECK (level >= 1 AND level <= 5),
-        notes TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
+        patient_id TEXT PRIMARY KEY,
+        level INTEGER NOT NULL CHECK (level >= 1 AND level <= 5)
       )
     ''');
+
 
     await db.execute('''
       CREATE TABLE motor_skills_calendar (

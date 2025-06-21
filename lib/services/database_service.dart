@@ -233,57 +233,31 @@ class DatabaseService {
   }
 
   // =============================================================================
-  // GMFCS
+  // GMFCS — только текущее значение
   // =============================================================================
 
-  /// Добавить уровень GMFCS
-  Future<int> addGMFCS(String patientId, int level, {String? notes}) async {
+  /// Установить или обновить уровень GMFCS пациента
+  Future<bool> setGMFCS(String patientId, int level) async {
     if (level < 1 || level > 5) {
       throw ArgumentError('GMFCS level должен быть от 1 до 5');
     }
 
-    final now = DateTime.now();
-    final gmfcs = GMFCS(
-      patientId: patientId,
-      level: level,
-      notes: notes,
-      createdAt: now,
-      updatedAt: now,
-    );
-    return await _gmfcsDAO.insert(gmfcs);
+    final gmfcs = GMFCS(patientId: patientId, level: level);
+    final result = await _gmfcsDAO.upsert(gmfcs);
+    return result > 0;
   }
 
-  /// Получить все уровни GMFCS пациента
-  Future<List<GMFCS>> getGMFCSRecords(String patientId) async {
+  /// Получить текущий уровень GMFCS пациента
+  Future<GMFCS?> getGMFCS(String patientId) async {
     return await _gmfcsDAO.getByPatient(patientId);
   }
 
-  /// Получить последний уровень GMFCS пациента
-  Future<GMFCS?> getLatestGMFCS(String patientId) async {
-    return await _gmfcsDAO.getLatestByPatient(patientId);
-  }
-
-  /// Получить конкретную запись GMFCS
-  Future<GMFCS?> getGMFCS(int id) async {
-    return await _gmfcsDAO.getById(id);
-  }
-
-  /// Обновить запись GMFCS
-  Future<bool> updateGMFCS(GMFCS gmfcs) async {
-    if (gmfcs.level < 1 || gmfcs.level > 5) {
-      throw ArgumentError('GMFCS level должен быть от 1 до 5');
-    }
-
-    final updatedGMFCS = gmfcs.copyWith(updatedAt: DateTime.now());
-    final result = await _gmfcsDAO.update(updatedGMFCS);
+  /// Удалить уровень GMFCS у пациента
+  Future<bool> deleteGMFCS(String patientId) async {
+    final result = await _gmfcsDAO.deleteByPatient(patientId);
     return result > 0;
   }
 
-  /// Удалить запись GMFCS
-  Future<bool> deleteGMFCS(int id) async {
-    final result = await _gmfcsDAO.delete(id);
-    return result > 0;
-  }
 
   // =============================================================================
   // КАЛЕНДАРЬ МОТОРНЫХ НАВЫКОВ
@@ -495,7 +469,7 @@ class DatabaseService {
     final densitometries = await getDensitometries(patientId);
     final motorSkills = await getMotorSkills(patientId);
     final latestSalivation = await getLatestSalivation(patientId);
-    final latestGMFCS = await getLatestGMFCS(patientId);
+    final latestGMFCS = await getGMFCS(patientId);
 
     return {
       'patientId': patientId,
@@ -557,12 +531,6 @@ class DatabaseService {
       final salivations = await getSalivations(patientId);
       for (final salivation in salivations) {
         await deleteSalivation(salivation.id!);
-      }
-
-      // Удаляем записи GMFCS
-      final gmfcsRecords = await getGMFCSRecords(patientId);
-      for (final gmfcs in gmfcsRecords) {
-        await deleteGMFCS(gmfcs.id!);
       }
 
       // Удаляем моторные навыки
