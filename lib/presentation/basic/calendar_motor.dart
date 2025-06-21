@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neuro_control/assets/colors/app_colors.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../database/entities/motor_skills_calendar.dart';
 import '../../services/database_service.dart';
@@ -149,13 +150,13 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
             color: Colors.white,
           ),
         ),
-        backgroundColor: const Color(0xFF6366F1),
+        backgroundColor: AppColors.primaryColor,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
+          indicatorColor: AppColors.thirdColor,
           indicatorWeight: 3,
-          labelColor: Colors.white,
+          labelColor: AppColors.thirdColor,
           unselectedLabelColor: Colors.white70,
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
@@ -182,12 +183,12 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddNoteDialog(),
-        backgroundColor: const Color(0xFF6366F1),
-        icon: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: AppColors.secondryColor,
+        icon: const Icon(Icons.add, color: AppColors.thirdColor),
         label: const Text(
           'Добавить',
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.thirdColor,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -201,7 +202,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
         Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.thirdColor,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -229,11 +230,11 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
               ),
               leftChevronIcon: Icon(
                 Icons.chevron_left,
-                color: Color(0xFF6366F1),
+                color: AppColors.secondryColor,
               ),
               rightChevronIcon: Icon(
                 Icons.chevron_right,
-                color: Color(0xFF6366F1),
+                color: AppColors.secondryColor,
               ),
             ),
             calendarStyle: CalendarStyle(
@@ -241,11 +242,11 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
               weekendTextStyle: const TextStyle(color: Color(0xFF6B7280)),
               holidayTextStyle: const TextStyle(color: Color(0xFF6B7280)),
               selectedDecoration: const BoxDecoration(
-                color: Color(0xFF6366F1),
+                color: AppColors.secondryColor,
                 shape: BoxShape.circle,
               ),
               todayDecoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withOpacity(0.3),
+                color: AppColors.secondryColor.withOpacity(0.3),
                 shape: BoxShape.circle,
               ),
               markerDecoration: const BoxDecoration(
@@ -316,7 +317,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.thirdColor,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -346,12 +347,12 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withOpacity(0.1),
+                color: AppColors.secondryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
                 Icons.directions_run,
-                color: Color(0xFF6366F1),
+                color: AppColors.secondryColor,
               ),
             ),
             children: events.map((event) => _buildEventTile(event)).toList(),
@@ -400,7 +401,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
   Widget _buildEventTile(MotorSkillsCalendar event) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.thirdColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const Color(0xFFE5E7EB),
@@ -449,7 +450,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
               value: 'edit',
               child: Row(
                 children: [
-                  Icon(Icons.edit, color: Color(0xFF6366F1)),
+                  Icon(Icons.edit, color: AppColors.secondryColor),
                   SizedBox(width: 8),
                   Text('Редактировать'),
                 ],
@@ -459,7 +460,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
               value: 'delete',
               child: Row(
                 children: [
-                  Icon(Icons.delete, color: Colors.red),
+                  Icon(Icons.delete, color: AppColors.errorColor),
                   SizedBox(width: 8),
                   Text('Удалить'),
                 ],
@@ -550,7 +551,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      borderSide: const BorderSide(color: AppColors.secondryColor),
                     ),
                   ),
                   maxLines: 2,
@@ -573,7 +574,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      borderSide: const BorderSide(color: AppColors.secondryColor),
                     ),
                   ),
                   maxLines: 3,
@@ -603,14 +604,14 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
+                backgroundColor: AppColors.secondryColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: const Text(
                 'Добавить',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: AppColors.thirdColor),
               ),
             ),
           ],
@@ -698,7 +699,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      borderSide: const BorderSide(color: AppColors.secondryColor),
                     ),
                   ),
                   maxLines: 2,
@@ -721,7 +722,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      borderSide: const BorderSide(color: AppColors.secondryColor),
                     ),
                   ),
                   maxLines: 3,
@@ -752,7 +753,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
+                backgroundColor: AppColors.secondryColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -800,14 +801,14 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.errorColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: const Text(
               'Удалить',
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(color: AppColors.thirdColor),
             ),
           ),
         ],
