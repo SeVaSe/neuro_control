@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import '../../assets/data/texts/strings.dart';
 import '../../assets/colors/app_colors.dart';
+import '../../assets/data/texts/strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'calendar_motor.dart';
 import 'manual_screen.dart';
 import '../widgets/FirstLaunchDialog.dart';
 import 'about_screen.dart';
@@ -65,7 +66,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           'lib/assets/svg/calendar_exp_icon.svg',
                           buttonSize,
                           onPressed: () {
-                            _showPlaceholderDialog(context, 'Календарь моторных навыков');
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CalendarMotorPage()
+                              ),
+                            );
                           },
                         ),
                         _buildButton(
