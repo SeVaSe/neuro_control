@@ -4,6 +4,7 @@ import '../screensTopic/topic_detail_manual.dart';
 import '../../services/database_service.dart';
 import '../../database/entities/reference_guide.dart';
 import '../../assets/colors/app_colors.dart';
+import 'package:flutter/services.dart';
 
 class ManualScreen extends StatefulWidget {
   const ManualScreen({Key? key}) : super(key: key);
@@ -14,9 +15,10 @@ class ManualScreen extends StatefulWidget {
 
 class _ManualScreenState extends State<ManualScreen> {
   final DatabaseService _databaseService = DatabaseService();
+  final ScrollController _scrollController = ScrollController();
 
-  List<ReferenceGuide> allGuides = []; // Все записи справочника
-  List<ReferenceGuide> filteredGuides = []; // Отфильтрованные записи для поиска
+  List<ReferenceGuide> allGuides = [];
+  List<ReferenceGuide> filteredGuides = [];
   final TextEditingController searchController = TextEditingController();
 
   bool isLoading = true;
@@ -29,7 +31,6 @@ class _ManualScreenState extends State<ManualScreen> {
     searchController.addListener(_filterGuides);
   }
 
-  /// Загрузка записей справочника из базы данных
   Future<void> _loadGuides() async {
     try {
       setState(() {
@@ -49,33 +50,25 @@ class _ManualScreenState extends State<ManualScreen> {
         errorMessage = 'Ошибка загрузки данных: $e';
         isLoading = false;
       });
-      debugPrint('Ошибка загрузки справочника: $e');
     }
   }
 
-  /// Фильтрация записей по названию
   void _filterGuides() {
     final query = searchController.text.toLowerCase().trim();
 
     setState(() {
-      if (query.isEmpty) {
-        filteredGuides = allGuides;
-      } else {
-        filteredGuides = allGuides
-            .where((guide) =>
-        guide.title.toLowerCase().contains(query) ||
-            (guide.category?.toLowerCase().contains(query) ?? false))
-            .toList();
-      }
+      filteredGuides = query.isEmpty
+          ? allGuides
+          : allGuides.where((guide) =>
+      guide.title.toLowerCase().contains(query) ||
+          (guide.category?.toLowerCase().contains(query) ?? false)).toList();
     });
   }
 
-  /// Обновление списка (pull-to-refresh)
   Future<void> _refreshGuides() async {
     await _loadGuides();
   }
 
-  /// Переход к детальному просмотру записи
   void _navigateToDetail(ReferenceGuide guide) {
     Navigator.push(
       context,
@@ -96,87 +89,125 @@ class _ManualScreenState extends State<ManualScreen> {
     final isTablet = screenSize.width > 600;
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
-      appBar: AppBar(
-        backgroundColor: AppColors.primaryColor,
-        iconTheme: const IconThemeData(color: AppColors.thirdColor),
-        title: const Text(
-          AppStrings.buttonStartManualString,
-          style: TextStyle(
-            fontFamily: 'TinosBold',
-            fontWeight: FontWeight.bold,
-            color: AppColors.thirdColor,
-          ),
-        ),
-        elevation: 2,
-      ),
-      body: Column(
-        children: [
-          // Строка поиска
-          Container(
-            padding: EdgeInsets.all(isTablet ? 20.0 : 16.0),
-            child: TextField(
-              controller: searchController,
-              decoration: InputDecoration(
-                hintText: 'Поиск по названию или категории...',
-                hintStyle: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: isTablet ? 16 : 14,
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  color: AppColors.secondryColor,
-                  size: isTablet ? 28 : 24,
-                ),
-                suffixIcon: searchController.text.isNotEmpty
-                    ? IconButton(
-                  icon: Icon(
-                    Icons.clear,
-                    color: Colors.grey[600],
-                    size: isTablet ? 24 : 20,
-                  ),
-                  onPressed: () {
-                    searchController.clear();
-                  },
-                )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: const BorderSide(
-                    color: AppColors.secondryColor,
-                    width: 2,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide(
-                    color: Colors.grey[300]!,
-                    width: 1.5,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: const BorderSide(
-                    color: AppColors.secondryColor,
-                    width: 2,
-                  ),
-                ),
-                filled: true,
-                fillColor: AppColors.thirdColor,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 20 : 16,
-                  vertical: isTablet ? 16 : 12,
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: NestedScrollView(
+        controller: _scrollController,
+        headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              backgroundColor: AppColors.primaryColor,
+              iconTheme: const IconThemeData(color: AppColors.thirdColor),
+              title: const Text(
+                AppStrings.buttonStartManualString,
+                style: TextStyle(
+                  fontFamily: 'TinosBold',
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.thirdColor,
                 ),
               ),
-              style: TextStyle(fontSize: isTablet ? 16 : 14),
-            ),
-          ),
+              elevation: 0,
+              pinned: true,
+              floating: false,
+              snap: false,
+              expandedHeight: 130,
+              systemOverlayStyle: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+              ),
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(color: AppColors.primaryColor),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 80, 24, 0),
+                      child: Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
 
-          // Основной контент
-          Expanded(
-            child: _buildMainContent(isTablet),
-          ),
-        ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(0),
+                child: Container(
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(isTablet ? 20.0 : 16.0),
+                child: TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Поиск по названию или категории...',
+                    hintStyle: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: isTablet ? 16 : 14,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: AppColors.secondryColor,
+                      size: isTablet ? 28 : 24,
+                    ),
+                    suffixIcon: searchController.text.isNotEmpty
+                        ? IconButton(
+                      icon: Icon(
+                        Icons.clear,
+                        color: Colors.grey[600],
+                        size: isTablet ? 24 : 20,
+                      ),
+                      onPressed: () {
+                        searchController.clear();
+                      },
+                    )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: const BorderSide(
+                        color: AppColors.secondryColor,
+                        width: 2,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide(
+                        color: Colors.grey[300]!,
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: const BorderSide(
+                        color: AppColors.secondryColor,
+                        width: 2,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: AppColors.thirdColor,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: isTablet ? 20 : 16,
+                      vertical: isTablet ? 16 : 12,
+                    ),
+                  ),
+                  style: TextStyle(fontSize: isTablet ? 16 : 14),
+                ),
+              ),
+            ),
+          ];
+        },
+        body: _buildMainContent(isTablet),
       ),
     );
   }
@@ -286,7 +317,6 @@ class _ManualScreenState extends State<ManualScreen> {
       onRefresh: _refreshGuides,
       color: AppColors.primaryColor,
       child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.symmetric(
           horizontal: isTablet ? 20 : 16,
           vertical: isTablet ? 12 : 8,
@@ -379,6 +409,7 @@ class _ManualScreenState extends State<ManualScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     searchController.dispose();
     super.dispose();
   }

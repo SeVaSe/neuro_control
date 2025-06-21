@@ -19,6 +19,7 @@ class AppStrings {
   static const String buttonAutorsAboutString = 'Авторы';
   static const String buttonOsnAboutString = 'Основные возможности';
   static const String buttonTehsupAboutString = 'Написать в техподдержку';
+  static const String buttonGMFCSAboutString = 'Поменять GMFCS';
   static const String buttonOptionsAboutString = 'Настройки';
   static const String buttonVideoAboutString = 'Видео приветствие';
   static const String buttonStorageAboutString = 'Хранилище';

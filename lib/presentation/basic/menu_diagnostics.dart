@@ -40,93 +40,107 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   final List<MenuItemData> menuItems = [
     MenuItemData(
       title: 'Осмотр ортопеда',
-      description: 'Комплексное обследование опорно-двигательного аппарата',
+      description: 'Подзаголовок осмотр ортопеда...',
       iconData: Icons.medical_services_outlined,
       color: const Color(0xFF6C63FF),
       lightColor: const Color(0xFFE8E6FF),
     ),
     MenuItemData(
       title: 'Рентгенография',
-      description: 'Высокоточная диагностика костных структур',
+      description: 'Подзаголовок рентографии...',
       iconData: Icons.medical_information_outlined,
       color: const Color(0xFFFF6B6B),
       lightColor: const Color(0xFFFFE8E8),
     ),
     MenuItemData(
       title: 'Денситометрия',
-      description: 'Измерение плотности костной ткани',
+      description: 'Подзаголовок денситометрии...',
       iconData: Icons.analytics_outlined,
       color: const Color(0xFF4ECDC4),
       lightColor: const Color(0xFFE8FFFD),
     ),
     MenuItemData(
       title: 'Слюнотечение',
-      description: 'Диагностика и лечение гиперсаливации',
+      description: 'Подзаголовок слюнотечение...',
       iconData: Icons.water_drop_outlined,
       color: const Color(0xFF45B7D1),
       lightColor: const Color(0xFFE8F7FF),
     ),
     MenuItemData(
-      title: 'Ортезы',
-      description: 'Подбор и изготовление ортопедических изделий',
+      title: 'Ортезы нижних конечностей',
+      description: 'Подзаголовок ортезы...',
       iconData: Icons.build_outlined,
       color: const Color(0xFFFF8A65),
       lightColor: const Color(0xFFFFF2E8),
     ),
+    MenuItemData(
+      title: 'Ортезы верхних конечностей',
+      description: 'Подзаголовок ортезы...',
+      iconData: Icons.build_outlined,
+      color: const Color(0xFFFFC965),
+      lightColor: const Color(0xFFFFF3E1),
+    )
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: AppColors.primaryColor,
-        iconTheme: const IconThemeData(
-          color: AppColors.thirdColor,
-        ),
-        title: const Text(
-          AppStrings.buttonStartTreeString,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontFamily: 'TinosBold',
-            color: AppColors.thirdColor,
-          ),
-        ),
-        elevation: 0,
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-        ),
-      ),
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const ClampingScrollPhysics(),
           slivers: [
-            // Header section
-            SliverToBoxAdapter(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.primaryColor,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(32),
-                    bottomRight: Radius.circular(32),
-                  ),
+            // AppBar с заголовком и описанием как единое целое
+            SliverAppBar(
+              backgroundColor: AppColors.primaryColor,
+              iconTheme: const IconThemeData(
+                color: AppColors.thirdColor,
+              ),
+              title: const Text(
+                AppStrings.buttonStartTreeString,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'TinosBold',
+                  color: AppColors.thirdColor,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Выберите подходящую диагностику для вас',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.thirdColor.withOpacity(0.8),
-                          fontWeight: FontWeight.w400,
+              ),
+              elevation: 0,
+              pinned: true,
+              expandedHeight: 130,
+              systemOverlayStyle: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+              ),
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor,
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 80, 24, 0),
+                      child: Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+
                         ),
                       ),
-                    ],
+                    ),
+                  ),
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(0),
+                child: Container(
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
+                    ),
                   ),
                 ),
               ),
@@ -134,7 +148,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
             // Menu items
             SliverPadding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -192,7 +206,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   void _navigateToPage(BuildContext context, MenuItemData item) {
-    if (!mounted) return; // Проверяем, что виджет все еще активен
+    if (!mounted) return;
 
     Navigator.push(
       context,
@@ -504,5 +518,3 @@ class PlaceholderPage extends StatelessWidget {
     );
   }
 }
-
-// Добавим импорт для SystemUiOverlayStyle
