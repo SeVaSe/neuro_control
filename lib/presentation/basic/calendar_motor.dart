@@ -3,6 +3,9 @@ import 'package:neuro_control/assets/colors/app_colors.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../database/entities/motor_skills_calendar.dart';
 import '../../services/database_service.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
+
 
 class CalendarMotorPage extends StatefulWidget {
   const CalendarMotorPage({Key? key}) : super(key: key);
@@ -31,6 +34,8 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
   @override
   void initState() {
     super.initState();
+    initializeDateFormatting('ru', null); // Импорт и инициализация русской локали
+    Intl.defaultLocale = 'ru';            // Установка русской локали
     _tabController = TabController(length: 2, vsync: this);
     _selectedDay = DateTime.now();
     _loadEvents();
@@ -143,6 +148,9 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        iconTheme: const IconThemeData(
+          color: AppColors.thirdColor,
+        ),
         title: const Text(
           'Моторные навыки',
           style: TextStyle(
@@ -213,6 +221,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
             ],
           ),
           child: TableCalendar<MotorSkillsCalendar>(
+            locale: 'ru',
             firstDay: DateTime.utc(2020, 1, 1),
             lastDay: DateTime.utc(2030, 12, 31),
             focusedDay: _focusedDay,
@@ -511,6 +520,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                       initialDate: selectedDate,
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2030),
+                      locale: const Locale('ru'), // <- добавляем это
                     );
                     if (date != null) {
                       setState(() {
@@ -659,6 +669,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                       initialDate: selectedDate,
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2030),
+                      locale: const Locale('ru'),
                     );
                     if (date != null) {
                       setState(() {

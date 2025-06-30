@@ -23,6 +23,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'assets/colors/app_colors.dart';
 import 'assets/data/texts/strings.dart';
 import 'presentation/basic/download_page.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() {
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -33,6 +34,14 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ru'), // Русский язык
+      ],
       home: SplashScreen(),
       theme: ThemeData(
         fontFamily: 'Tinos',
