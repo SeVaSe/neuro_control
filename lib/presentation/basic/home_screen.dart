@@ -5,7 +5,6 @@ import '../../assets/data/texts/strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'calendar_motor.dart';
 import 'manual_screen.dart';
-import '../widgets/FirstLaunchDialog.dart';
 import 'about_screen.dart';
 import 'menu_diagnostics.dart';
 
@@ -22,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAndShowFirstLaunchDialog();
+    //_checkAndShowFirstLaunchDialog();
   }
 
   @override
@@ -232,46 +231,46 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Проверяем первый запуск и показываем диалог
-  Future<void> _checkAndShowFirstLaunchDialog() async {
-    if (_isFirstLaunchChecked) return;
+  // // Проверяем первый запуск и показываем диалог
+  // Future<void> _checkAndShowFirstLaunchDialog() async {
+  //   if (_isFirstLaunchChecked) return;
+  //
+  //   try {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final bool isFirstLaunch = prefs.getBool('isFirstLaunch') ?? true;
+  //
+  //     if (isFirstLaunch && mounted) {
+  //       // Отмечаем, что приложение уже было запущено
+  //       await prefs.setBool('isFirstLaunch', false);
+  //
+  //       // Показываем диалог после построения виджета
+  //       WidgetsBinding.instance.addPostFrameCallback((_) {
+  //         if (mounted) {
+  //           _showFirstLaunchDialog();
+  //         }
+  //       });
+  //     }
+  //   } catch (e) {
+  //     debugPrint('Ошибка при проверке первого запуска: $e');
+  //   }
+  //
+  //   _isFirstLaunchChecked = true;
+  // }
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final bool isFirstLaunch = prefs.getBool('isFirstLaunch') ?? true;
-
-      if (isFirstLaunch && mounted) {
-        // Отмечаем, что приложение уже было запущено
-        await prefs.setBool('isFirstLaunch', false);
-
-        // Показываем диалог после построения виджета
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _showFirstLaunchDialog();
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Ошибка при проверке первого запуска: $e');
-    }
-
-    _isFirstLaunchChecked = true;
-  }
-
-  void _showFirstLaunchDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return FirstLaunchDialog(
-          onLearnMorePressed: () {
-            Navigator.of(context).pop();
-            _showPlaceholderDialog(context, 'Обучение навыкам');
-          },
-        );
-      },
-    );
-  }
+  // void _showFirstLaunchDialog() {
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: false,
+  //     builder: (BuildContext context) {
+  //       return FirstLaunchDialog(
+  //         onLearnMorePressed: () {
+  //           Navigator.of(context).pop();
+  //           _showPlaceholderDialog(context, 'Обучение навыкам');
+  //         },
+  //       );
+  //     },
+  //   );
+  // }
 
   // Заглушка для переходов на другие экраны
   void _showPlaceholderDialog(BuildContext context, String feature) {
