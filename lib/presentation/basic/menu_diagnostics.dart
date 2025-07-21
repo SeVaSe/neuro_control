@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../assets/colors/app_colors.dart';
 import '../../assets/data/texts/strings.dart';
+import '../pages/Diagnostics/ortoped_page.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({Key? key}) : super(key: key);
@@ -44,6 +45,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       iconData: Icons.medical_services_outlined,
       color: const Color(0xFF6C63FF),
       lightColor: const Color(0xFFE8E6FF),
+      builder: (context) => const OrtopedPage(patientId: '1', patientName: '',),
     ),
     MenuItemData(
       title: 'Рентгенография',
@@ -91,7 +93,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         child: CustomScrollView(
           physics: const ClampingScrollPhysics(),
           slivers: [
-            // AppBar с заголовком и описанием как единое целое
             SliverAppBar(
               backgroundColor: AppColors.primaryColor,
               iconTheme: const IconThemeData(
@@ -114,20 +115,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryColor,
-                  ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 80, 24, 0),
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-
-                        ),
-                      ),
-                    ),
+                  color: AppColors.primaryColor,
+                  child: const SafeArea(
+                    child: SizedBox.shrink(),
                   ),
                 ),
               ),
@@ -145,8 +135,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 ),
               ),
             ),
-
-            // Menu items
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
               sliver: SliverList(
@@ -208,152 +196,106 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   void _navigateToPage(BuildContext context, MenuItemData item) {
     if (!mounted) return;
 
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            PlaceholderPage(item: item),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(1.0, 0.0);
-          const end = Offset.zero;
-          const curve = Curves.easeInOutCubic;
-
-          var tween = Tween(begin: begin, end: end).chain(
-            CurveTween(curve: curve),
-          );
-
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 300),
-      ),
-    );
+    if (item.builder != null) {
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => item.builder!(context),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(1.0, 0.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOutCubic;
+            var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+            return SlideTransition(
+              position: animation.drive(tween),
+              child: FadeTransition(opacity: animation, child: child),
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 300),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PlaceholderPage(item: item)),
+      );
+    }
   }
 }
 
-class MenuCard extends StatefulWidget {
+class MenuCard extends StatelessWidget {
   final MenuItemData item;
   final VoidCallback onTap;
 
-  const MenuCard({
-    Key? key,
-    required this.item,
-    required this.onTap,
-  }) : super(key: key);
-
-  @override
-  State<MenuCard> createState() => _MenuCardState();
-}
-
-class _MenuCardState extends State<MenuCard> {
-  bool _isPressed = false;
+  const MenuCard({Key? key, required this.item, required this.onTap}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) {
-        if (mounted) {
-          setState(() => _isPressed = true);
-        }
-      },
-      onTapUp: (_) {
-        if (mounted) {
-          setState(() => _isPressed = false);
-          widget.onTap();
-        }
-      },
-      onTapCancel: () {
-        if (mounted) {
-          setState(() => _isPressed = false);
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeInOut,
-        transform: Matrix4.identity()
-          ..scale(_isPressed ? 0.98 : 1.0),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: widget.item.color.withOpacity(0.15),
-                blurRadius: _isPressed ? 8 : 12,
-                offset: Offset(0, _isPressed ? 2 : 6),
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: item.color.withOpacity(0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: item.lightColor,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(item.iconData, size: 28, color: item.color),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'TinosBold',
+                        color: Color(0xFF2C3E50),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.description,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: item.color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.arrow_forward_ios, size: 16, color: item.color),
               ),
             ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              children: [
-                // Icon container
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: widget.item.lightColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    widget.item.iconData,
-                    size: 28,
-                    color: widget.item.color,
-                  ),
-                ),
-                const SizedBox(width: 20),
-
-                // Text content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.item.title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2C3E50),
-                          fontFamily: 'TinosBold',
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        widget.item.description,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                          height: 1.4,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Arrow icon
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: widget.item.color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: widget.item.color,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -367,6 +309,7 @@ class MenuItemData {
   final IconData iconData;
   final Color color;
   final Color lightColor;
+  final Widget Function(BuildContext context)? builder;
 
   MenuItemData({
     required this.title,
@@ -374,10 +317,10 @@ class MenuItemData {
     required this.iconData,
     required this.color,
     required this.lightColor,
+    this.builder,
   });
 }
 
-// Заглушка для страниц
 class PlaceholderPage extends StatelessWidget {
   final MenuItemData item;
 
@@ -389,9 +332,7 @@ class PlaceholderPage extends StatelessWidget {
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: item.color,
-        iconTheme: const IconThemeData(
-          color: Colors.white,
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           item.title,
           style: const TextStyle(
@@ -406,7 +347,6 @@ class PlaceholderPage extends StatelessWidget {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            // Hero section
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
@@ -431,11 +371,7 @@ class PlaceholderPage extends StatelessWidget {
                         color: item.lightColor,
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: Icon(
-                        item.iconData,
-                        size: 48,
-                        color: item.color,
-                      ),
+                      child: Icon(item.iconData, size: 48, color: item.color),
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -462,29 +398,20 @@ class PlaceholderPage extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 32),
-
-            // Status card
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: item.color.withOpacity(0.2),
-                  width: 1,
-                ),
+                border: Border.all(color: item.color.withOpacity(0.2), width: 1),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: item.lightColor,
                         borderRadius: BorderRadius.circular(20),
