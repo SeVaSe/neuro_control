@@ -597,7 +597,12 @@ class _OrtopedPageState extends State<OrtopedPage> {
       appBar: AppBar(
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
-        title: Text('Ортопед'),
+        title: Text('Ортопед',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

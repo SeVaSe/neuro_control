@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../assets/colors/app_colors.dart';
 import '../../assets/data/texts/strings.dart';
 import '../pages/Diagnostics/ortoped_page.dart';
+import '../pages/Diagnostics/rentgen_page.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({Key? key}) : super(key: key);
@@ -53,6 +54,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       iconData: Icons.medical_information_outlined,
       color: const Color(0xFFFF6B6B),
       lightColor: const Color(0xFFFFE8E8),
+      builder: (context) => const RentgenPage(orthopedicExaminationId: 1,),
     ),
     MenuItemData(
       title: 'Денситометрия',
