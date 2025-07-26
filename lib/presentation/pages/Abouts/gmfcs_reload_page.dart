@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../assets/colors/app_colors.dart';
+import '../../../services/database_service.dart';
 
 class GMFCSUpdateScreen extends StatefulWidget {
   const GMFCSUpdateScreen({Key? key}) : super(key: key);
@@ -11,6 +12,24 @@ class GMFCSUpdateScreen extends StatefulWidget {
 class _GMFCSUpdateScreenState extends State<GMFCSUpdateScreen> {
   int? selectedLevel;
   Map<String, bool> answers = {};
+  final _dbService = DatabaseService();
+  static const _localPatientId = '1'; // локальный ID
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingGMFCS();
+  }
+
+  void _loadExistingGMFCS() async {
+    final gmfs = await _dbService.getGMFCS(_localPatientId);
+    if (gmfs != null) {
+      setState(() {
+        selectedLevel = gmfs.level;
+      });
+    }
+  }
+
 
   final List<Map<String, dynamic>> questions = [
     {
@@ -191,12 +210,32 @@ class _GMFCSUpdateScreenState extends State<GMFCSUpdateScreen> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(28),
                     onTap: answers.length == questions.length
-                        ? () {
-                      // TODO: сохранить изменения, например:
-                      print('Сохранён уровень GMFCS: $selectedLevel');
-                      Navigator.pop(context); // назад после изменения
+                        ? () async {
+                      if (selectedLevel == null) return;
+
+                      try {
+                        final success = await _dbService.setGMFCS(_localPatientId, selectedLevel!);
+                        if (!success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Не удалось сохранить GMFCS')),
+                          );
+                          return;
+                        }
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('GMFCS уровень обновлён')),
+                        );
+
+                        Navigator.pop(context); // вернуться назад
+                      } catch (e) {
+                        print("Ошибка при сохранении GMFCS: $e");
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Ошибка сохранения GMFCS')),
+                        );
+                      }
                     }
                         : null,
+
                     child: Center(
                       child: Text(
                         'Изменить',

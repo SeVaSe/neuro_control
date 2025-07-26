@@ -27,11 +27,22 @@ class _RentgenPageState extends State<RentgenPage> with SingleTickerProviderStat
   bool _isLoading = false;
   String _searchQuery = '';
   String _selectedFilter = 'Все';
+  int _currentTabIndex = 0; // Добавляем переменную для отслеживания текущей вкладки
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    // Добавляем слушатель для отслеживания изменений вкладок
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        setState(() {
+          _currentTabIndex = _tabController.index;
+        });
+      }
+    });
+
     _loadXrayImages();
   }
 
@@ -740,7 +751,6 @@ class _RentgenPageState extends State<RentgenPage> with SingleTickerProviderStat
               ),
             ),
             const SizedBox(height: 24),
-            
           ],
         ),
       );
@@ -1051,7 +1061,8 @@ class _RentgenPageState extends State<RentgenPage> with SingleTickerProviderStat
             ),
             tooltip: 'Добавить напоминание',
           ),
-          if (_tabController.index == 1) // Показываем только на вкладке картотеки
+          // Используем _currentTabIndex вместо _tabController.index
+          if (_currentTabIndex == 1)
             IconButton(
               onPressed: _addXrayFile,
               icon: const Icon(
@@ -1109,7 +1120,8 @@ class _RentgenPageState extends State<RentgenPage> with SingleTickerProviderStat
           _buildFilesList(),
         ],
       ),
-      floatingActionButton: _tabController.index == 1 // Показываем только на вкладке картотеки
+      // Используем _currentTabIndex вместо _tabController.index
+      floatingActionButton: _currentTabIndex == 1
           ? FloatingActionButton.extended(
         onPressed: _addXrayFile,
         backgroundColor: const Color(0xFFFF6B6B),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../assets/colors/app_colors.dart';
+import '../../../services/database_service.dart';
 
 class GMFCSScreen extends StatefulWidget {
   final VoidCallback onNext;
@@ -21,6 +22,25 @@ class GMFCSScreen extends StatefulWidget {
 class _GMFCSScreenState extends State<GMFCSScreen> {
   int? selectedLevel;
   Map<String, bool> answers = {};
+  final DatabaseService _dbService = DatabaseService();
+  static const String _localPatientId = '1'; // Локальный ID
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingGMFCS();
+  }
+
+  void _loadExistingGMFCS() async {
+    final gmfs = await _dbService.getGMFCS(_localPatientId);
+    if (gmfs != null) {
+      setState(() {
+        selectedLevel = gmfs.level;
+      });
+    }
+  }
+
+
 
   final List<Map<String, dynamic>> questions = [
     {
@@ -57,8 +77,7 @@ class _GMFCSScreenState extends State<GMFCSScreen> {
     },
   ];
 
-  void calculateGMFCS() {
-    // Простая логика расчета GMFCS на основе ответов
+  void calculateGMFCS() async {
     int trueCount = answers.values.where((answer) => answer == true).length;
 
     int level;
@@ -74,11 +93,24 @@ class _GMFCSScreenState extends State<GMFCSScreen> {
       level = 5;
     }
 
+    // Сохраняем GMFCS в БД
+    try {
+      final success = await _dbService.setGMFCS(_localPatientId, level);
+      if (!success) {
+        // Обработка ошибки сохранения
+        print("Не удалось сохранить GMFCS в БД.");
+      }
+    } catch (e) {
+      print("Ошибка при сохранении GMFCS: $e");
+    }
+
     setState(() {
       selectedLevel = level;
     });
+
     widget.onGMFCSSelected(level);
   }
+
 
   @override
   Widget build(BuildContext context) {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart';
 import '../../assets/colors/app_colors.dart';
 import '../../assets/data/texts/strings.dart';
+import '../pages/Diagnostics/densitometr_page.dart';
 import '../pages/Diagnostics/ortoped_page.dart';
 import '../pages/Diagnostics/rentgen_page.dart';
 
@@ -62,6 +64,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       iconData: Icons.analytics_outlined,
       color: const Color(0xFF4ECDC4),
       lightColor: const Color(0xFFE8FFFD),
+      builder: (context) => const DensitometrPage(patientId: '1'),
     ),
     MenuItemData(
       title: 'Слюнотечение',
