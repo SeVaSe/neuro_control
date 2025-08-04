@@ -23,6 +23,126 @@ class _AboutProgramState extends State<AboutProgram> {
     super.dispose();
   }
 
+  // Метод для показа диалога подтверждения изменения GMFCS
+  void _showGMFCSConfirmationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Пользователь должен выбрать опцию
+      builder: (BuildContext context) {
+        final double screenWidth = MediaQuery.of(context).size.width;
+        final bool isTablet = screenWidth > 600;
+
+        return AlertDialog(
+          backgroundColor: AppColors.thirdColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: AppColors.errorColor,
+                size: isTablet ? 28.0 : 24.0,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Подтверждение изменения',
+                  style: TextStyle(
+                    color: AppColors.secondryColor,
+                    fontSize: isTablet ? 20.0 : 18.0,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'TinosBold',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Если вы измените уровень GMFCS, текущий уровень будет изменен на новый.',
+                style: TextStyle(
+                  color: AppColors.text2Color,
+                  fontSize: isTablet ? 16.0 : 14.0,
+                  fontWeight: FontWeight.w400,
+                  height: 1.4,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Вы точно хотите продолжить?',
+                style: TextStyle(
+                  color: AppColors.secondryColor,
+                  fontSize: isTablet ? 16.0 : 14.0,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            // Кнопка "Отмена"
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Закрываем диалог
+              },
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 20.0 : 16.0,
+                  vertical: isTablet ? 12.0 : 10.0,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Отмена',
+                style: TextStyle(
+                  color: AppColors.text2Color,
+                  fontSize: isTablet ? 16.0 : 14.0,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+
+            // Кнопка "Продолжить"
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Закрываем диалог
+                // Переходим к экрану изменения GMFCS
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => GMFCSUpdateScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: AppColors.thirdColor,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 20.0 : 16.0,
+                  vertical: isTablet ? 12.0 : 10.0,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 2,
+              ),
+              child: Text(
+                'Продолжить',
+                style: TextStyle(
+                  fontSize: isTablet ? 16.0 : 14.0,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
@@ -193,7 +313,8 @@ class _AboutProgramState extends State<AboutProgram> {
                   Icons.published_with_changes,
                   screenHeight,
                   screenWidth,
-                  GMFCSUpdateScreen()),
+                  null, // Передаем null, так как теперь используем специальную логику
+                  isGMFCS: true), // Добавляем новый флаг для GMFCS
               _buildButton(
                   AppStrings.buttonStorageAboutString,
                   Icons.storage,
@@ -224,7 +345,7 @@ class _AboutProgramState extends State<AboutProgram> {
     );
   }
 
-  // Метод _buildButton оставлен без изменений, как было запрошено
+  // Обновленный метод _buildButton с поддержкой GMFCS подтверждения
   Widget _buildButton(
       String text,
       IconData icon,
@@ -233,6 +354,7 @@ class _AboutProgramState extends State<AboutProgram> {
       Widget? destinationScreen, {
         bool isVideoWelcome = false,
         bool isStorage = false,
+        bool isGMFCS = false, // Новый флаг для GMFCS
       }) {
     return Column(
       children: [
@@ -277,7 +399,10 @@ class _AboutProgramState extends State<AboutProgram> {
               size: (screenWidth * 0.04).clamp(16.0, 20.0),
             ),
             onTap: () {
-              if (destinationScreen != null) {
+              // Специальная обработка для GMFCS с подтверждением
+              if (isGMFCS) {
+                _showGMFCSConfirmationDialog();
+              } else if (destinationScreen != null) {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => destinationScreen),
