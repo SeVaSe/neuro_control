@@ -6,6 +6,7 @@ import '../../assets/data/texts/strings.dart';
 import '../pages/Diagnostics/densitometr_page.dart';
 import '../pages/Diagnostics/ortoped_page.dart';
 import '../pages/Diagnostics/rentgen_page.dart';
+import '../pages/Diagnostics/salivation_page.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({Key? key}) : super(key: key);
@@ -76,6 +77,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       secondaryColor: const Color(0xFF0984E3),
       lightColor: const Color(0xFFEBF8FF),
       size: TileSize.small,
+      builder: (context) => const SalivationPage(),
     ),
     MenuItemData(
       title: 'Ортезы нижних конечностей',
