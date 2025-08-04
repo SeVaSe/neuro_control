@@ -59,7 +59,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       secondaryColor: const Color(0xFFFECFEF),
       lightColor: const Color(0xFFFFF5F5),
       size: TileSize.medium,
-      builder: (context) => const RentgenPage(orthopedicExaminationId: 1),
+      builder: (context) => const RentgenPage(orthopedicExaminationId: 1, patientId: "1",),
     ),
     MenuItemData(
       title: 'Денситометрия',
