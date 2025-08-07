@@ -1,22 +1,7 @@
-// import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart';
-// import 'presentation/basic/download_page.dart'; // Подключаем ваш DownloadPage
-//
-// void main() {
-//   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-//   runApp(MaterialApp(
-//     home: DownloadPage(), // Устанавливаем DownloadPage как главный экран
-//     theme: ThemeData(
-//       fontFamily: 'Tinos',  // Устанавливаем шрифт для всего приложения
-//       scaffoldBackgroundColor: Colors.white,
-//     ),
-//   ));
-// }
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:neuro_control/presentation/basic/home_screen.dart';
 import 'package:neuro_control/presentation/pages/Starter/onboarding_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,7 +69,6 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-
   void _startProgress() {
     Timer.periodic(Duration(milliseconds: 100), (timer) {
       setState(() {
@@ -92,11 +76,6 @@ class _SplashScreenState extends State<SplashScreen> {
         if (_progress >= 1.0) {
           _progress = 1.0;
           timer.cancel();
-          // Переход на HomeScreen
-          // Navigator.pushReplacement(
-          //   context,
-          //   MaterialPageRoute(builder: (context) => HomeScreen()),
-          // );
         }
       });
     });
@@ -122,8 +101,8 @@ class _SplashScreenState extends State<SplashScreen> {
                   Container(
                     width: MediaQuery.of(context).size.width * 0.5,
                     height: MediaQuery.of(context).size.width * 0.5,
-                    child: SvgPicture.asset(
-                      'lib/assets/svg/down_icon.svg', // Replace with your SVG asset path
+                    child: Image.asset(
+                      'lib/assets/imgs/tree.png',
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -132,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     AppStrings.nameAppString,
                     style: TextStyle(
                       color: AppColors.thirdColor,
-                      fontSize: screenWidth * 0.10, // Адаптируемый размер шрифта
+                      fontSize: screenWidth * 0.10,
                       fontFamily: 'TinosBold',
                       fontWeight: FontWeight.w800,
                     ),
@@ -176,4 +155,3 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-

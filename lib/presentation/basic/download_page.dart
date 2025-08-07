@@ -57,8 +57,8 @@ class _DownloadPageState extends State<DownloadPage> {
                   Container(
                     width: MediaQuery.of(context).size.width * 0.5,
                     height: MediaQuery.of(context).size.width * 0.5,
-                    child: SvgPicture.asset(
-                      'lib/assets/svg/down_icon.svg', // Replace with your SVG asset path
+                    child: Image.asset(
+                      'lib/assets/imgs/tree.png', // Replace with your SVG asset path
                       fit: BoxFit.contain,
                     ),
                   ),
