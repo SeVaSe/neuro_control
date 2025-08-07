@@ -1,0 +1,18 @@
+{
+  "orthoses": [
+    {
+      "imagePath": "lib/assets/imgs/img_test_ort.png",
+      "name": "Кни-АФО (ортез колено-голеностоп-стопа)",
+      "description": "Используется при парезах и для коррекции патологий ходьбы.",
+      "wearingMode": "Постоянное дневное ношение",
+      "timeType": "Дневной"
+    },
+    {
+      "imagePath": "lib/assets/imgs/img_test_ort.png",
+      "name": "Ночной шина-ортез",
+      "description": "Поддерживает стопу в функциональном положении во время сна.",
+      "wearingMode": "Ношение только во время сна",
+      "timeType": "Ночной"
+    }
+  ]
+}

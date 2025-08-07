@@ -5,6 +5,7 @@ import '../../assets/data/texts/strings.dart';
 import '../pages/Abouts/autors_page.dart';
 import '../pages/Abouts/gmfcs_reload_page.dart';
 import '../pages/Abouts/instruction_page.dart';
+import '../pages/Abouts/video_hello_page.dart';
 
 class AboutProgram extends StatefulWidget {
   const AboutProgram({Key? key}) : super(key: key);
@@ -316,25 +317,19 @@ class _AboutProgramState extends State<AboutProgram> {
                   null, // Передаем null, так как теперь используем специальную логику
                   isGMFCS: true), // Добавляем новый флаг для GMFCS
               _buildButton(
-                  AppStrings.buttonStorageAboutString,
-                  Icons.storage,
-                  screenHeight,
-                  screenWidth,
-                  null, // Пока null, можно заменить на StorageScreen()
-                  isStorage: true),
-              _buildButton(
                   AppStrings.buttonVideoAboutString,
                   Icons.play_circle_outline,
                   screenHeight,
                   screenWidth,
-                  null, // Пока null, можно заменить на VideoWelcomeScreen()
-                  isVideoWelcome: true),
-              _buildButton(
-                  AppStrings.buttonOptionsAboutString,
-                  Icons.bubble_chart_rounded,
-                  screenHeight,
-                  screenWidth,
-                  null),
+                  VideoHelloPage(),
+              ),
+              // ,
+              // _buildButton(
+              //     AppStrings.buttonOptionsAboutString,
+              //     Icons.bubble_chart_rounded,
+              //     screenHeight,
+              //     screenWidth,
+              //     null),
 
               // Дополнительное пространство внизу для удобства прокрутки
               SizedBox(height: screenHeight * 0.02),
@@ -411,8 +406,6 @@ class _AboutProgramState extends State<AboutProgram> {
                 String message;
                 if (isVideoWelcome) {
                   message = 'Видео приветствие будет добавлено в следующих обновлениях!';
-                } else if (isStorage) {
-                  message = 'Хранилище будет добавлено в следующих обновлениях!';
                 } else {
                   message = 'Настройки появятся в следующих обновлениях!';
                 }
