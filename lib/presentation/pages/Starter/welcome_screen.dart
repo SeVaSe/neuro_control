@@ -236,10 +236,33 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
+  // Адаптивные размеры шрифтов
+  double _getTitleFontSize(double screenWidth) {
+    if (screenWidth < 350) return screenWidth * 0.075;
+    if (screenWidth < 400) return screenWidth * 0.08;
+    if (screenWidth > 500) return screenWidth * 0.07;
+    return screenWidth * 0.08;
+  }
+
+  double _getDescriptionFontSize(double screenWidth) {
+    if (screenWidth < 350) return screenWidth * 0.042;
+    if (screenWidth < 400) return screenWidth * 0.048;
+    if (screenWidth > 500) return screenWidth * 0.042;
+    return screenWidth * 0.05;
+  }
+
+  double _getCallToActionFontSize(double screenWidth) {
+    if (screenWidth < 350) return screenWidth * 0.044;
+    if (screenWidth < 400) return screenWidth * 0.048;
+    if (screenWidth > 500) return screenWidth * 0.042;
+    return screenWidth * 0.05;
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenHeight < 700;
 
     return Scaffold(
       body: SafeArea(
@@ -261,35 +284,54 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _buildVideoPlayer(screenWidth, screenHeight),
-                          SizedBox(height: screenHeight * 0.04),
+
+                          SizedBox(height: isSmallScreen ? screenHeight * 0.03 : screenHeight * 0.04),
+
+                          // Заголовок "Добро пожаловать!"
                           Text(
                             'Добро пожаловать!',
                             style: TextStyle(
-                              fontSize: screenWidth * 0.08,
+                              fontSize: _getTitleFontSize(screenWidth),
                               fontWeight: FontWeight.bold,
                               color: AppColors.mainTitleColor,
+                              letterSpacing: 0.5,
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          SizedBox(height: screenHeight * 0.02),
-                          Text(
-                            'Это медицинское приложение поможет вам в оценке и мониторинге состояния здоровья.',
-                            style: TextStyle(
-                              fontSize: screenWidth * 0.045,
-                              color: AppColors.text2Color,
-                              height: 1.4,
+
+                          SizedBox(height: isSmallScreen ? screenHeight * 0.02 : screenHeight * 0.025),
+
+                          // Основное описание приложения
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
+                            child: Text(
+                              'Данное приложение поможет вам, уважаемые родители, контролировать посещения врачей, вовремя проходить обследования вашего ребенка и избежать ряда рисков, связанных с опорно-двигательным аппаратом.',
+                              style: TextStyle(
+                                fontSize: _getDescriptionFontSize(screenWidth),
+                                color: AppColors.text2Color,
+                                height: 1.5,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                          SizedBox(height: screenHeight * 0.015),
-                          Text(
-                            'Давайте начнем настройку приложения специально для вас.',
-                            style: TextStyle(
-                              fontSize: screenWidth * 0.04,
-                              color: AppColors.text1Color,
-                              height: 1.4,
+
+                          SizedBox(height: isSmallScreen ? screenHeight * 0.02 : screenHeight * 0.025),
+
+                          // Призыв к действию
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
+                            child: Text(
+                              'Давайте начнем настройку приложения специально для вас.',
+                              style: TextStyle(
+                                fontSize: _getCallToActionFontSize(screenWidth),
+                                color: AppColors.text1Color,
+                                height: 1.4,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.3,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
@@ -297,11 +339,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   ),
                 ),
               ),
+
               SizedBox(height: screenHeight * 0.02),
+
+              // Кнопка "Начать настройку"
               Container(
                 width: double.infinity,
                 height: screenHeight * 0.07,
-                constraints: BoxConstraints(minHeight: 50, maxHeight: 70),
+                constraints: BoxConstraints(
+                  minHeight: 50,
+                  maxHeight: isSmallScreen ? 65 : 75,
+                ),
                 decoration: BoxDecoration(
                   gradient: AppColors.primaryGradient,
                   borderRadius: BorderRadius.circular(28),
@@ -328,9 +376,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               color: Colors.white,
                               fontSize: screenWidth * 0.045,
                               fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                          SizedBox(width: 8),
+                          SizedBox(width: 10),
                           Icon(
                             Icons.arrow_forward,
                             color: Colors.white,

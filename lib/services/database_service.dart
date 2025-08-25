@@ -3,6 +3,7 @@ import '../database/dao/orthopedic_dao.dart';
 import '../database/dao/densitometry_dao.dart';
 import '../database/dao/salivation_dao.dart';
 import '../database/dao/gmfcs_dao.dart';
+import '../database/dao/patient_birth_date_dao.dart';
 import '../database/entities/orthopedic_examination.dart';
 import '../database/entities/xray_image.dart';
 import '../database/entities/xray_chart.dart';
@@ -18,6 +19,7 @@ import '../database/entities/reference_guide.dart';
 import '../database/entities/reference_guide_image.dart';
 import '../database/entities/operation_manual.dart';
 import '../database/entities/operation_manual_image.dart';
+import '../database/entities/patient_birth_date.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -31,6 +33,7 @@ class DatabaseService {
   final MotorSkillsCalendarDAO _motorSkillsDAO = MotorSkillsCalendarDAO();
   final ReferenceGuideDAO _referenceGuideDAO = ReferenceGuideDAO();
   final OperationManualDAO _operationManualDAO = OperationManualDAO();
+  final PatientBirthDateDAO _patientBirthDateDAO = PatientBirthDateDAO();
 
   // =============================================================================
   // ОРТОПЕДИЧЕСКИЕ ОСМОТРЫ
@@ -543,5 +546,47 @@ class DatabaseService {
     } catch (e) {
       return false;
     }
+  }
+
+
+// =============================================================================
+// ДАТА РОЖДЕНИЯ ПАЦИЕНТА
+// =============================================================================
+
+  /// Установить дату рождения пациента
+  Future<bool> setPatientBirthDate(String patientId, DateTime birthDate) async {
+    final now = DateTime.now();
+    final patientBirthDate = PatientBirthDate(
+      patientId: patientId,
+      birthDate: birthDate,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final result = await _patientBirthDateDAO.upsert(patientBirthDate);
+    return result > 0;
+  }
+
+  /// Получить дату рождения пациента
+  Future<PatientBirthDate?> getPatientBirthDate(String patientId) async {
+    return await _patientBirthDateDAO.getByPatient(patientId);
+  }
+
+  /// Обновить дату рождения пациента
+  Future<bool> updatePatientBirthDate(String patientId, DateTime birthDate) async {
+    final existing = await getPatientBirthDate(patientId);
+    if (existing == null) return false;
+
+    final updated = existing.copyWith(
+      birthDate: birthDate,
+      updatedAt: DateTime.now(),
+    );
+    final result = await _patientBirthDateDAO.update(updated);
+    return result > 0;
+  }
+
+  /// Удалить дату рождения пациента
+  Future<bool> deletePatientBirthDate(String patientId) async {
+    final result = await _patientBirthDateDAO.deleteByPatient(patientId);
+    return result > 0;
   }
 }

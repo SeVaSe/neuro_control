@@ -20,7 +20,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3, // Увеличиваем версию для новой таблицы
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -104,7 +104,6 @@ class AppDatabase {
       )
     ''');
 
-
     await db.execute('''
       CREATE TABLE motor_skills_calendar (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,6 +116,15 @@ class AppDatabase {
       )
     ''');
 
+    // Новая таблица для хранения даты рождения пациентов
+    await db.execute('''
+      CREATE TABLE patient_birth_date (
+        patient_id TEXT PRIMARY KEY,
+        birth_date INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
 
     // Таблица справочника
     await db.execute('''
@@ -168,7 +176,6 @@ class AppDatabase {
       )
     ''');
 
-
     // Индексы для оптимизации запросов
     await db.execute('CREATE INDEX idx_orthopedic_patient ON orthopedic_examinations(patient_id)');
     await db.execute('CREATE INDEX idx_xray_images_exam ON xray_images(orthopedic_examination_id)');
@@ -179,10 +186,12 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_gmfcs_patient ON gmfcs(patient_id)');
     await db.execute('CREATE INDEX idx_motor_skills_patient ON motor_skills_calendar(patient_id)');
     await db.execute('CREATE INDEX idx_motor_skills_date ON motor_skills_calendar(skill_date)');
+    await db.execute('CREATE INDEX idx_patient_birth_date ON patient_birth_date(patient_id)');
     await db.execute('CREATE INDEX idx_reference_guide_category ON reference_guide(category)');
     await db.execute('CREATE INDEX idx_reference_images_guide ON reference_guide_images(reference_guide_id)');
     await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
     await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
+
     await _insertInitialReferenceGuides(db);
     await _insertInitialInstructions(db);
   }
@@ -216,9 +225,20 @@ class AppDatabase {
       )
     ''');
 
+      // Добавляем новую таблицу для даты рождения пациентов
+      await db.execute('''
+      CREATE TABLE patient_birth_date (
+        patient_id TEXT PRIMARY KEY,
+        birth_date INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
       // Индексы для производительности
       await db.execute('CREATE INDEX idx_motor_skills_patient ON motor_skills_calendar(patient_id)');
       await db.execute('CREATE INDEX idx_motor_skills_date ON motor_skills_calendar(skill_date)');
+      await db.execute('CREATE INDEX idx_patient_birth_date ON patient_birth_date(patient_id)');
       await db.execute('CREATE INDEX idx_reference_guide_category ON reference_guide(category)');
       await db.execute('CREATE INDEX idx_reference_images_guide ON reference_guide_images(reference_guide_id)');
       await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
@@ -346,7 +366,7 @@ class AppDatabase {
       },
       {
         'title': 'Раздел "Справочник"',
-        'description': 'Узнайте о медицинских паталогиях больше...',
+        'description': 'Узнайте о медицинских патологиях больше...',
         'category': 'Разделы',
         'created_at': now,
         'updated_at': now,
@@ -367,7 +387,7 @@ class AppDatabase {
       },
       {
         'title': 'Раздел "Справочник"',
-        'description': 'Узнайте о медицинских паталогиях больше...',
+        'description': 'Узнайте о медицинских патологиях больше...',
         'category': 'Разделы',
         'created_at': now,
         'updated_at': now,
@@ -388,7 +408,7 @@ class AppDatabase {
       },
       {
         'title': 'Раздел "Справочник"',
-        'description': 'Узнайте о медицинских паталогиях больше...',
+        'description': 'Узнайте о медицинских патологиях больше...',
         'category': 'Разделы',
         'created_at': now,
         'updated_at': now,
@@ -409,7 +429,7 @@ class AppDatabase {
       },
       {
         'title': 'Раздел "Справочник"',
-        'description': 'Узнайте о медицинских паталогиях больше...',
+        'description': 'Узнайте о медицинских патологиях больше...',
         'category': 'Разделы',
         'created_at': now,
         'updated_at': now,
@@ -426,15 +446,14 @@ class AppDatabase {
     await batch.commit(noResult: true);
   }
 
-
-// Отдельный метод для закрытия БД
+  // Отдельный метод для закрытия БД
   Future<void> close() async {
     final db = await database;
     await db.close();
     _database = null;
   }
 
-// Метод для удаления БД (например, при сбросе или разработке)
+  // Метод для удаления БД (например, при сбросе или разработке)
   Future<void> deleteDatabase() async {
     final databasePath = await getDatabasesPath();
     final path = join(databasePath, 'medical_app.db');

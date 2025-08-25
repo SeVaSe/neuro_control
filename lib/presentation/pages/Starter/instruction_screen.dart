@@ -36,12 +36,12 @@ class _InstructionScreenState extends State<InstructionScreen> {
     if (instructionStartTime != null) {
       final elapsed = DateTime.now().difference(instructionStartTime!);
 
-      if (elapsed.inSeconds >= 15) {
+      if (elapsed.inSeconds >= 10) {
         setState(() {
           hasReadInstructions = true;
         });
       } else {
-        _showWarningDialog(15 - elapsed.inSeconds);
+        _showWarningDialog(10 - elapsed.inSeconds);
       }
     }
   }
