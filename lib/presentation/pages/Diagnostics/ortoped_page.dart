@@ -25,42 +25,97 @@ class OrtopedPage extends StatefulWidget {
   State<OrtopedPage> createState() => _OrtopedPageState();
 }
 
-class _OrtopedPageState extends State<OrtopedPage> {
+class _OrtopedPageState extends State<OrtopedPage>
+    with SingleTickerProviderStateMixin {
   final DatabaseService _databaseService = DatabaseService();
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
-  List<OrthopedicExamination> _examinations = [];
-  Map<int, List<PhotoRecord>> _photoRecords = {};
+  List<PhotoRecord> _allPhotoRecords = [];
   bool _isLoading = false;
+  int? _patientAge;
+  int? _gmfcsLevel;
 
-  static const Color _primaryColor = Color(0xFF6C63FF);
-  static const Color _lightColor = Color(0xFFE8E6FF);
+  static const Color _primaryColor = Color(0xFF66BB6A);
+  static const Color _lightColor = Color(0xFFE6FFEB);
+  static const Color _yellowColor = Color(0xFFFFC107);
+  static const Color _whiteColor = Colors.white;
 
   @override
   void initState() {
     super.initState();
-    _loadExaminations();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+    _loadPhotoRecords();
+    _loadPatientData();
+    _animationController.forward();
   }
 
-  Future<void> _loadExaminations() async {
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPatientData() async {
+    try {
+      // Загружаем дату рождения
+      final birthDateRecord = await _databaseService.getPatientBirthDate(widget.patientId);
+      if (birthDateRecord != null) {
+        final age = _calculateAge(birthDateRecord.birthDate);
+        setState(() {
+          _patientAge = age;
+        });
+      }
+
+      // Загружаем GMFCS
+      final gmfcsRecord = await _databaseService.getGMFCS(widget.patientId);
+      if (gmfcsRecord != null) {
+        setState(() {
+          _gmfcsLevel = gmfcsRecord.level;
+        });
+      }
+    } catch (e) {
+      print('Ошибка загрузки данных пациента: $e');
+    }
+  }
+
+  int _calculateAge(DateTime birthDate) {
+    final now = DateTime.now();
+    int age = now.year - birthDate.year;
+    if (now.month < birthDate.month ||
+        (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  Future<void> _loadPhotoRecords() async {
     setState(() => _isLoading = true);
     try {
       final examinations = await _databaseService
           .getOrthopedicExaminations(widget.patientId);
 
-      setState(() {
-        _examinations = examinations;
-      });
+      List<PhotoRecord> allPhotos = [];
 
-      // Загружаем фото для каждого осмотра
       for (final examination in examinations) {
         if (examination.id != null) {
-          final photos = await _databaseService
-              .getPhotoRecords(examination.id!);
-          setState(() {
-            _photoRecords[examination.id!] = photos;
-          });
+          final photos =
+          await _databaseService.getPhotoRecords(examination.id!);
+          allPhotos.addAll(photos);
         }
       }
+
+      allPhotos.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      setState(() {
+        _allPhotoRecords = allPhotos;
+      });
     } catch (e) {
       _showErrorSnackBar('Ошибка загрузки данных: $e');
     } finally {
@@ -68,99 +123,60 @@ class _OrtopedPageState extends State<OrtopedPage> {
     }
   }
 
-  Future<void> _createNewExamination() async {
-    try {
-      await _databaseService.createOrthopedicExamination(widget.patientId);
-      await _loadExaminations();
-      _showSuccessSnackBar('Новый осмотр создан');
-    } catch (e) {
-      _showErrorSnackBar('Ошибка создания осмотра: $e');
+  // Новый метод, возвращающий актуальный список (используется папкой)
+  Future<List<PhotoRecord>> _fetchAllPhotoRecordsForPatient() async {
+    final examinations =
+    await _databaseService.getOrthopedicExaminations(widget.patientId);
+    List<PhotoRecord> allPhotos = [];
+    for (final examination in examinations) {
+      if (examination.id != null) {
+        final photos = await _databaseService.getPhotoRecords(examination.id!);
+        allPhotos.addAll(photos);
+      }
     }
+    allPhotos.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return allPhotos;
   }
 
-  Future<void> _deleteExamination(int id) async {
-    final confirmed = await _showConfirmDialog(
-      'Удалить осмотр?',
-      'Все связанные файлы также будут удалены',
+  // schedule теперь получает Future<void> Function()
+  void _navigateToSchedule() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _ExaminationSchedulePage(
+          patientName: widget.patientName,
+          patientAge: _patientAge,
+          gmfcsLevel: _gmfcsLevel,
+          onConclusionPhoto: _addConclusionPhoto,
+        ),
+      ),
     );
-
-    if (confirmed) {
-      try {
-        await _databaseService.deleteOrthopedicExamination(id);
-        await _loadExaminations();
-        _showSuccessSnackBar('Осмотр удален');
-      } catch (e) {
-        _showErrorSnackBar('Ошибка удаления: $e');
-      }
-    }
   }
 
-  Future<void> _addPhotoToExamination(int examinationId) async {
-    final sourceType = await _showImageSourceDialog();
-    if (sourceType == null) return;
-
-    try {
-      String? filePath;
-
-      if (sourceType == 'camera') {
-        final ImagePicker picker = ImagePicker();
-        final XFile? image = await picker.pickImage(source: ImageSource.camera);
-        filePath = image?.path;
-      } else if (sourceType == 'gallery') {
-        final ImagePicker picker = ImagePicker();
-        final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-        filePath = image?.path;
-      } else if (sourceType == 'file') {
-        FilePickerResult? result = await FilePicker.platform.pickFiles(
-          type: FileType.any,
-          allowMultiple: false,
-        );
-        filePath = result?.files.single.path;
-      }
-
-      if (filePath != null) {
-        final description = await _showDescriptionDialog();
-        await _databaseService.addPhotoRecord(
-          examinationId,
-          filePath,
-          description: description?.isNotEmpty == true ? description : null,
-        );
-        await _loadExaminations();
-        _showSuccessSnackBar('Файл добавлен');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Ошибка добавления файла: $e');
-    }
-  }
-
-  Future<void> _deletePhoto(int photoId) async {
-    final confirmed = await _showConfirmDialog(
-      'Удалить файл?',
-      'Это действие нельзя отменить',
-    );
-
-    if (confirmed) {
-      try {
-        await _databaseService.deletePhotoRecord(photoId);
-        await _loadExaminations();
-        _showSuccessSnackBar('Файл удален');
-      } catch (e) {
-        _showErrorSnackBar('Ошибка удаления файла: $e');
-      }
-    }
+  void _navigateToFolder() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _ExaminationFolderPage(
+          photoRecords: _allPhotoRecords,
+          onAddPhoto: _addConclusionPhoto,
+          onDeletePhoto: _deletePhoto,
+          onViewFile: _viewFile,
+          fetchPhotoRecords: _fetchAllPhotoRecordsForPatient,
+        ),
+      ),
+    ).then((_) {
+      // Обновляем данные при возврате со страницы папки
+      _loadPhotoRecords();
+    });
   }
 
   Future<void> _scheduleReminder() async {
-    // Запрашиваем разрешение на доступ к календарю
-    final status = await Permission.calendar.request();
-
-
-
     final DateTime? selectedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
+      initialDate: DateTime.now().add(const Duration(days: 30)),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -202,8 +218,10 @@ class _OrtopedPageState extends State<OrtopedPage> {
   Future<void> _addToCalendar(DateTime appointmentDateTime) async {
     try {
       final Event event = Event(
-        title: 'Прием ортопеда - ${widget.patientName}',
-        description: 'Запланированный прием у врача-ортопеда для пациента ${widget.patientName}',
+        title: 'Осмотр ортопеда - ${widget.patientName}',
+        description:
+        'Плановый осмотр у врача-ортопеда для ${widget.patientName}. '
+            'Важно для контроля состояния опорно-двигательного аппарата.',
         location: 'Медицинский центр',
         startDate: appointmentDateTime,
         endDate: appointmentDateTime.add(const Duration(hours: 1)),
@@ -219,13 +237,139 @@ class _OrtopedPageState extends State<OrtopedPage> {
       final success = await Add2Calendar.addEvent2Cal(event);
 
       if (success) {
-        _showSuccessSnackBar('Событие добавлено в календарь');
+        _showSuccessSnackBar('Напоминание добавлено в календарь');
+        await _createAdditionalReminders(appointmentDateTime);
       } else {
         _showErrorSnackBar('Не удалось добавить событие в календарь');
       }
     } catch (e) {
       _showErrorSnackBar('Ошибка при добавлении в календарь: $e');
     }
+  }
+
+  Future<void> _createAdditionalReminders(DateTime appointmentDateTime) async {
+    final monthBefore = appointmentDateTime.subtract(const Duration(days: 30));
+    if (monthBefore.isAfter(DateTime.now())) {
+      await _addReminderEvent(
+          monthBefore, 'Напоминание: через месяц осмотр ортопеда');
+    }
+
+    final dayBefore = appointmentDateTime.subtract(const Duration(days: 1));
+    if (dayBefore.isAfter(DateTime.now())) {
+      await _addReminderEvent(dayBefore, 'Напоминание: завтра осмотр ортопеда');
+    }
+
+    final hourBefore = appointmentDateTime.subtract(const Duration(hours: 1));
+    if (hourBefore.isAfter(DateTime.now())) {
+      await _addReminderEvent(hourBefore, 'Напоминание: через час осмотр ортопеда');
+    }
+  }
+
+  Future<void> _addReminderEvent(DateTime dateTime, String title) async {
+    final Event event = Event(
+      title: title,
+      description: 'Напоминание об осмотре ортопеда для ${widget.patientName}',
+      startDate: dateTime,
+      endDate: dateTime.add(const Duration(minutes: 15)),
+    );
+    await Add2Calendar.addEvent2Cal(event);
+  }
+
+  Future<void> _addConclusionPhoto() async {
+    // Создаем новый осмотр для каждого заключения
+    final examinationId =
+    await _databaseService.createOrthopedicExamination(widget.patientId);
+    await _addPhotoToExamination(examinationId);
+    // Обновляем локальный список после добавления
+    await _loadPhotoRecords();
+  }
+
+  Future<void> _addPhotoToExamination(int examinationId) async {
+    final sourceType = await _showImageSourceDialog();
+    if (sourceType == null) return;
+
+    try {
+      String? filePath;
+
+      if (sourceType == 'camera') {
+        final ImagePicker picker = ImagePicker();
+        final XFile? image = await picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
+        );
+        filePath = image?.path;
+      } else if (sourceType == 'gallery') {
+        final ImagePicker picker = ImagePicker();
+        final XFile? image = await picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 85,
+        );
+        filePath = image?.path;
+      } else if (sourceType == 'file') {
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+          allowMultiple: false,
+        );
+        filePath = result?.files.single.path;
+      }
+
+      if (filePath != null) {
+        final fileInfo = await _showFileInfoDialog();
+        if (fileInfo != null) {
+          await _databaseService.addPhotoRecord(
+            examinationId,
+            filePath,
+            description:
+            '${fileInfo['title']} - ${fileInfo['date']} - ${fileInfo['description']}',
+          );
+          await _loadPhotoRecords(); // Обновляем данные сразу
+          _showSuccessSnackBar('Заключение сохранено');
+        }
+      }
+    } catch (e) {
+      _showErrorSnackBar('Ошибка добавления файла: $e');
+    }
+  }
+
+  Future<void> _deletePhoto(int photoId) async {
+    final confirmed = await _showConfirmDialog(
+      'Удалить заключение?',
+      'Это действие нельзя отменить',
+    );
+
+    if (confirmed) {
+      try {
+        await _databaseService.deletePhotoRecord(photoId);
+        await _loadPhotoRecords(); // Обновляем данные сразу
+        _showSuccessSnackBar('Заключение удалено');
+      } catch (e) {
+        _showErrorSnackBar('Ошибка удаления: $e');
+      }
+    }
+  }
+
+  void _viewFile(PhotoRecord photo) async {
+    final file = File(photo.imagePath);
+
+    if (!file.existsSync()) {
+      _showErrorSnackBar('Файл не найден');
+      return;
+    }
+
+    try {
+      final result = await OpenFile.open(photo.imagePath);
+      if (result.type != ResultType.done) {
+        _showErrorSnackBar('Не удалось открыть файл: ${result.message}');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Ошибка открытия файла: $e');
+    }
+  }
+
+  bool _isImageFile(String filePath) {
+    final extension = filePath.toLowerCase().split('.').last;
+    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension);
   }
 
   Future<String?> _showImageSourceDialog() async {
@@ -240,48 +384,89 @@ class _OrtopedPageState extends State<OrtopedPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: _primaryColor),
-              title: const Text('Камера', style: TextStyle(color: _primaryColor)),
-              onTap: () => Navigator.pop(context, 'camera'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library, color: _primaryColor),
-              title: const Text('Галерея', style: TextStyle(color: _primaryColor)),
-              onTap: () => Navigator.pop(context, 'gallery'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.insert_drive_file, color: _primaryColor),
-              title: const Text('Файл', style: TextStyle(color: _primaryColor)),
-              onTap: () => Navigator.pop(context, 'file'),
-            ),
+            _buildSourceOption(Icons.camera_alt, 'Камера', 'camera'),
+            _buildSourceOption(Icons.photo_library, 'Галерея', 'gallery'),
+            _buildSourceOption(Icons.insert_drive_file, 'Файл', 'file'),
           ],
         ),
       ),
     );
   }
 
-  Future<String?> _showDescriptionDialog() async {
-    final TextEditingController controller = TextEditingController();
+  Widget _buildSourceOption(IconData icon, String title, String value) {
+    return ListTile(
+      leading: Icon(icon, color: _primaryColor),
+      title: Text(title, style: const TextStyle(color: _primaryColor)),
+      onTap: () => Navigator.pop(context, value),
+    );
+  }
 
-    return await showDialog<String>(
+  Future<Map<String, String>?> _showFileInfoDialog() async {
+    final TextEditingController titleController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+    final TextEditingController dateController = TextEditingController(
+      text: _formatDate(DateTime.now()),
+    );
+
+    return await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: _lightColor,
         title: const Text(
-          'Описание файла',
+          'Информация о заключении',
           style: TextStyle(color: _primaryColor, fontWeight: FontWeight.bold),
         ),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Введите описание (необязательно)',
-            border: OutlineInputBorder(),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: _primaryColor),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(
+                labelText: 'Название',
+                hintText: 'Например: Заключение ортопеда',
+                border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: _primaryColor),
+                ),
+              ),
             ),
-          ),
-          maxLines: 3,
+            const SizedBox(height: 12),
+            TextField(
+              controller: dateController,
+              decoration: const InputDecoration(
+                labelText: 'Дата',
+                border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: _primaryColor),
+                ),
+              ),
+              readOnly: true,
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (date != null) {
+                  dateController.text = _formatDate(date);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Описание',
+                hintText: 'Дополнительная информация',
+                border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: _primaryColor),
+                ),
+              ),
+              maxLines: 2,
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -289,7 +474,15 @@ class _OrtopedPageState extends State<OrtopedPage> {
             child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            onPressed: () {
+              if (titleController.text.trim().isNotEmpty) {
+                Navigator.pop(context, {
+                  'title': titleController.text.trim(),
+                  'date': dateController.text,
+                  'description': descriptionController.text.trim(),
+                });
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: _primaryColor,
               foregroundColor: Colors.white,
@@ -347,247 +540,8 @@ class _OrtopedPageState extends State<OrtopedPage> {
     );
   }
 
-  Widget _buildPhotoGrid(List<PhotoRecord> photos, int examinationId) {
-    if (photos.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: _lightColor.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _lightColor),
-        ),
-        child: const Column(
-          children: [
-            Icon(Icons.folder_open, color: Colors.grey, size: 48),
-            SizedBox(height: 8),
-            Text(
-              'Файлы не добавлены',
-              style: TextStyle(color: Colors.grey, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1,
-      ),
-      itemCount: photos.length,
-      itemBuilder: (context, index) {
-        final photo = photos[index];
-        return _buildPhotoItem(photo);
-      },
-    );
-  }
-
-  Widget _buildPhotoItem(PhotoRecord photo) {
-    final file = File(photo.imagePath);
-    final isImage = _isImageFile(photo.imagePath);
-
-    return GestureDetector(
-      onTap: () => _viewFile(photo),
-      onLongPress: () => _deletePhoto(photo.id!),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _primaryColor.withOpacity(0.3)),
-          boxShadow: [
-            BoxShadow(
-              color: _primaryColor.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Stack(
-            children: [
-              if (isImage && file.existsSync())
-                Positioned.fill(
-                  child: Image.file(
-                    file,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: _lightColor,
-                      child: const Icon(
-                        Icons.broken_image,
-                        color: Colors.red,
-                        size: 32,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Container(
-                  color: _lightColor,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _getFileIcon(photo.imagePath),
-                        color: _primaryColor,
-                        size: 32,
-                      ),
-                      const SizedBox(height: 4),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          _getFileName(photo.imagePath),
-                          style: const TextStyle(fontSize: 10),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              // Индикатор описания
-              if (photo.description != null && photo.description!.isNotEmpty)
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: _primaryColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.description,
-                      color: Colors.white,
-                      size: 12,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  bool _isImageFile(String filePath) {
-    final extension = filePath.toLowerCase().split('.').last;
-    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension);
-  }
-
-  IconData _getFileIcon(String filePath) {
-    final extension = filePath.toLowerCase().split('.').last;
-    switch (extension) {
-      case 'pdf':
-        return Icons.picture_as_pdf;
-      case 'doc':
-      case 'docx':
-        return Icons.description;
-      case 'xls':
-      case 'xlsx':
-        return Icons.table_chart;
-      case 'ppt':
-      case 'pptx':
-        return Icons.slideshow;
-      case 'txt':
-        return Icons.text_snippet;
-      case 'zip':
-      case 'rar':
-      case '7z':
-        return Icons.archive;
-      case 'mp4':
-      case 'avi':
-      case 'mov':
-        return Icons.video_file;
-      case 'mp3':
-      case 'wav':
-      case 'flac':
-        return Icons.audio_file;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-      case 'bmp':
-        return Icons.image;
-      default:
-        return Icons.insert_drive_file;
-    }
-  }
-
-  String _getFileName(String filePath) {
-    return filePath.split('/').last;
-  }
-
-  void _viewFile(PhotoRecord photo) async {
-    final file = File(photo.imagePath);
-
-    if (!file.existsSync()) {
-      _showErrorSnackBar('Файл не найден');
-      return;
-    }
-
-    if (_isImageFile(photo.imagePath)) {
-      // Показываем изображение в диалоге
-      showDialog(
-        context: context,
-        builder: (context) => Dialog(
-          backgroundColor: Colors.black,
-          child: Stack(
-            children: [
-              Center(
-                child: InteractiveViewer(
-                  child: Image.file(
-                    file,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 40,
-                right: 20,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                ),
-              ),
-              if (photo.description != null && photo.description!.isNotEmpty)
-                Positioned(
-                  bottom: 20,
-                  left: 20,
-                  right: 20,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      photo.description!,
-                      style: const TextStyle(color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      // Пытаемся открыть файл внешним приложением
-      try {
-        final result = await OpenFile.open(photo.imagePath);
-        if (result.type != ResultType.done) {
-          _showErrorSnackBar('Не удалось открыть файл: ${result.message}');
-        }
-      } catch (e) {
-        _showErrorSnackBar('Ошибка открытия файла: $e');
-      }
-    }
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
   @override
@@ -597,7 +551,8 @@ class _OrtopedPageState extends State<OrtopedPage> {
       appBar: AppBar(
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
-        title: Text('Ортопед',
+        title: const Text(
+          'Ортопед',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -610,23 +565,779 @@ class _OrtopedPageState extends State<OrtopedPage> {
         ),
         actions: [
           IconButton(
-            onPressed: _scheduleReminder,
-            icon: const Icon(Icons.calendar_today),
-            tooltip: 'Добавить в календарь',
+            icon: const Icon(
+              Icons.help_outline,
+              color: Colors.white,
+              size: 24,
+            ),
+            onPressed: () {
+              // Заглушка - пока просто показываем снэкбар
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Справка ортопед'),
+                  backgroundColor: _primaryColor,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+        ],
+
+      ),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInfoCard(),
+              const SizedBox(height: 30),
+              _buildActionCards(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _lightColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _primaryColor.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: _primaryColor))
-          : RefreshIndicator(
-        color: _primaryColor,
-        onRefresh: _loadExaminations,
-        child: _examinations.isEmpty
-            ? _buildEmptyState()
-            : _buildExaminationsList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: _primaryColor,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Важная информация',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _primaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Осмотр ортопеда ребенка с ДЦП необходим для предотвращения развития ряда патологий со стороны опорно-двигательного аппарата таких, как вывих бедра, нейромышечный сколиоз, контрактуры, деформации стоп, боль, остеопороз.\n\nВ связи с этим ребенок должен быть осмотрен ортопедом согласно графику осмотров.',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCards() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: _navigateToSchedule,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: _primaryColor,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: _primaryColor.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.calendar_view_week,
+                  color: Colors.white,
+                  size: 48,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'График осмотров',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Просмотр графика и добавление заключений',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: _navigateToFolder,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: _yellowColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _yellowColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.folder,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Папка\nосмотров',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_allPhotoRecords.length} записей',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            Expanded(
+              child: GestureDetector(
+                onTap: _scheduleReminder,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: _whiteColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _primaryColor, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.thumb_up,
+                        color: _primaryColor,
+                        size: 36,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Напоминание',
+                        style: TextStyle(
+                          color: _primaryColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Настроить\nуведомления',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// Страница графика осмотров — теперь принимает Future<void> Function()
+class _ExaminationSchedulePage extends StatelessWidget {
+  final String patientName;
+  final int? patientAge;
+  final int? gmfcsLevel;
+  final Future<void> Function() onConclusionPhoto;
+
+  const _ExaminationSchedulePage({
+    required this.patientName,
+    required this.patientAge,
+    required this.gmfcsLevel,
+    required this.onConclusionPhoto,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF66BB6A),
+        foregroundColor: Colors.white,
+        title: const Text('График осмотров'),
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildPatientInfoCard(),
+            const SizedBox(height: 20),
+            _buildScheduleTable(),
+            const SizedBox(height: 20),
+            _buildRecommendationCard(),
+            const SizedBox(height: 30),
+            _buildConclusionCard(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPatientInfoCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6FFEB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF66BB6A), width: 1),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Данные пациента',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF66BB6A),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Column(
+                children: [
+                  const Icon(
+                    Icons.cake,
+                    color: Color(0xFF66BB6A),
+                    size: 24,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Возраст',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  Text(
+                    patientAge != null ? '$patientAge лет' : 'Не указан',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF66BB6A),),
+                  ),
+                ],
+              ),
+              Container(
+                width: 1,
+                height: 60,
+                color: Colors.grey.shade300,
+              ),
+              Column(
+                children: [
+                  const Icon(
+                    Icons.accessibility,
+                    color: Color(0xFF66BB6A),
+                    size: 24,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'GMFCS',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  Text(
+                    gmfcsLevel != null ? 'Уровень $gmfcsLevel' : 'Не указан',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF66BB6A),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScheduleTable() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFF66BB6A),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: const Center(
+              child: Text(
+                'График осмотров',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          Table(
+            border: TableBorder.all(color: Colors.grey.shade300),
+            columnWidths: const {
+              0: FixedColumnWidth(80),
+              1: FlexColumnWidth(),
+              2: FlexColumnWidth(),
+              3: FlexColumnWidth(),
+              4: FlexColumnWidth(),
+              5: FlexColumnWidth(),
+            },
+            children: [
+              _buildTableHeaderRow(),
+              _buildTableDataRow('2', [true, true, true, true, true]),
+              _buildTableDataRow('2,5', [false, false, false, true, true]),
+              _buildTableDataRow('3', [false, false, true, true, true]),
+              _buildTableDataRow('3,5', [false, false, false, true, true]),
+              _buildTableDataRow('4', [true, true, true, true, true]),
+              _buildTableDataRow('5', [false, false, true, true, true]),
+              _buildTableDataRow('6', [true, true, true, true, true]),
+              _buildTableDataRow('7', [false, false, true, true, true]),
+              _buildTableDataRow('8', [false, true, true, true, true]),
+              _buildTableDataRow('9', [false, false, true, true, true]),
+              _buildTableDataRow('10', [false, true, true, true, true]),
+              _buildTableDataRow('11', [false, false, true, true, true]),
+              _buildTableDataRow('12-16', [false, false, true, true, true], hasSpecialText: true),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  TableRow _buildTableHeaderRow() {
+    return TableRow(
+      decoration: const BoxDecoration(color: Color(0xFF66BB6A)),
+      children: [
+        _buildHeaderCell('Возраст'),
+        _buildHeaderCell('GMFCS 1'),
+        _buildHeaderCell('GMFCS 2'),
+        _buildHeaderCell('GMFCS 3'),
+        _buildHeaderCell('GMFCS 4'),
+        _buildHeaderCell('GMFCS 5'),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCell(String text) {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.all(12),
+      child: Center(
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 12,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  TableRow _buildTableDataRow(String age, List<bool> visits, {bool hasSpecialText = false}) {
+    final isCurrentAge = patientAge != null && _isAgeMatch(age, patientAge!);
+
+    return TableRow(
+      decoration: BoxDecoration(
+        color: isCurrentAge ? const Color(0xFFE6FFEB) : Colors.white,
+      ),
+      children: [
+        Container(
+          height: 60,
+          padding: const EdgeInsets.all(12),
+          decoration: const BoxDecoration(
+            color: Color(0xFF66BB6A),
+          ),
+          child: Center(
+            child: Text(
+              age,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        ...visits.asMap().entries.map((entry) {
+          final index = entry.key;
+          final shouldVisit = entry.value;
+          final isPatientColumn = gmfcsLevel != null && (index + 1) == gmfcsLevel;
+
+          return Container(
+            height: 60,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: shouldVisit
+                  ? (isPatientColumn && isCurrentAge ? const Color(0xFF4CAF50) : const Color(0xFF66BB6A))
+                  : (isPatientColumn && isCurrentAge ? const Color(0xFFE6FFEB) : Colors.white),
+              border: isPatientColumn
+                  ? Border.all(color: const Color(0xFF4CAF50), width: 2)
+                  : null,
+            ),
+            child: Center(
+              child: hasSpecialText && shouldVisit && (index >= 2) // GMFCS III, IV, V для 12-16 лет
+                  ? const Text(
+                'x2 год',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              )
+                  : (shouldVisit ? const Icon(Icons.check, color: Colors.white, size: 24) : const SizedBox()),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  bool _isAgeMatch(String ageRange, int patientAge) {
+    if (ageRange.contains('-')) {
+      // Для диапазона типа "12-16"
+      final parts = ageRange.split('-');
+      final minAge = int.tryParse(parts[0]) ?? 0;
+      final maxAge = int.tryParse(parts[1]) ?? 0;
+      return patientAge >= minAge && patientAge <= maxAge;
+    } else if (ageRange.contains(',')) {
+      // Для возраста типа "2,5"
+      final age = double.tryParse(ageRange.replaceAll(',', '.')) ?? 0;
+      return patientAge == age.floor();
+    } else {
+      // Для целого возраста
+      final age = int.tryParse(ageRange) ?? 0;
+      return patientAge == age;
+    }
+  }
+
+  Widget _buildRecommendationCard() {
+    final recommendation = _getRecommendation();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFAE0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFD500), width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.lightbulb_outline,
+                color: Color(0xFFFFD500),
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Рекомендация',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFFFD500),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            recommendation,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.black87,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getRecommendation() {
+    if (patientAge == null || gmfcsLevel == null) {
+      return 'Для получения персональной рекомендации необходимо указать возраст ребенка и уровень GMFCS в профиле пациента.';
+    }
+
+    // Определяем нужность посещения на основе таблицы
+    bool needsVisit = false;
+    bool needsTwiceAYear = false;
+
+    // Логика определения необходимости посещения на основе возраста и GMFCS
+    if (patientAge! <= 2) {
+      needsVisit = true; // Все уровни GMFCS
+    } else if (patientAge == 3 && gmfcsLevel! >= 3) {
+      needsVisit = true;
+    } else if (patientAge == 4) {
+      needsVisit = true; // Все уровни GMFCS
+    } else if (patientAge == 5 && gmfcsLevel! >= 3) {
+      needsVisit = true;
+    } else if (patientAge == 6) {
+      needsVisit = true; // Все уровни GMFCS
+    } else if (patientAge == 7 && gmfcsLevel! >= 3) {
+      needsVisit = true;
+    } else if (patientAge == 8 && gmfcsLevel! >= 2) {
+      needsVisit = true;
+    } else if (patientAge == 9 && gmfcsLevel! >= 3) {
+      needsVisit = true;
+    } else if (patientAge == 10 && gmfcsLevel! >= 2) {
+      needsVisit = true;
+    } else if (patientAge == 11 && gmfcsLevel! >= 3) {
+      needsVisit = true;
+    } else if (patientAge! >= 12 && patientAge! <= 16 && gmfcsLevel! >= 3) {
+      needsVisit = true;
+      needsTwiceAYear = true;
+    }
+
+    if (!needsVisit) {
+      return 'На данный момент плановый осмотр ортопеда не требуется согласно графику для возраста $patientAge лет и уровня GMFCS $gmfcsLevel.';
+    }
+
+    if (needsTwiceAYear) {
+      return 'Рекомендуется посещать ортопеда не менее ДВУХ РАЗ В ГОД. Возраст ребенка: $patientAge лет, уровень GMFCS: $gmfcsLevel. Регулярные осмотры особенно важны в подростковом возрасте для контроля прогрессирования деформаций.';
+    }
+
+    return 'Рекомендуется посещать ортопеда НЕ МЕНЕЕ ОДНОГО РАЗА В ГОД. Возраст ребенка: $patientAge лет, уровень GMFCS: $gmfcsLevel. Регулярные осмотры помогают своевременно выявить и предотвратить развитие ортопедических осложнений.';
+  }
+
+  Widget _buildConclusionCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6FFEB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF66BB6A), width: 2),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Заключение ортопеда',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF66BB6A),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Сфотографируйте или загрузите заключение врача',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () async {
+              // Ждём пока родитель выполнит весь процесс добавления (диалоги, сохранение)
+              await onConclusionPhoto();
+              // Остаёмся на странице графика — не делаем Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Заключение добавлено'), backgroundColor: Colors.green),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF66BB6A),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF66BB6A).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.add_a_photo,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Добавить заключение',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Страница папки осмотров (обновляет список сразу после добавления/удаления)
+class _ExaminationFolderPage extends StatefulWidget {
+  final List<PhotoRecord> photoRecords;
+  final Future<void> Function() onAddPhoto;
+  final Future<void> Function(int) onDeletePhoto;
+  final Function(PhotoRecord) onViewFile;
+  final Future<List<PhotoRecord>> Function() fetchPhotoRecords;
+
+  const _ExaminationFolderPage({
+    required this.photoRecords,
+    required this.onAddPhoto,
+    required this.onDeletePhoto,
+    required this.onViewFile,
+    required this.fetchPhotoRecords,
+  });
+
+  @override
+  State<_ExaminationFolderPage> createState() => _ExaminationFolderPageState();
+}
+
+class _ExaminationFolderPageState extends State<_ExaminationFolderPage> {
+  static const Color _primaryColor = Color(0xFF66BB6A);
+  static const Color _lightColor = Color(0xFFE6FFEB);
+  static const Color _yellowColor = Color(0xFFFFC107);
+
+  late List<PhotoRecord> _localPhotoRecords;
+
+  @override
+  void initState() {
+    super.initState();
+    _localPhotoRecords = widget.photoRecords;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: _primaryColor,
+        foregroundColor: Colors.white,
+        title: const Text('Папка осмотров'),
+        elevation: 0,
+      ),
+      body: _localPhotoRecords.isEmpty
+          ? _buildEmptyState()
+          : ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _localPhotoRecords.length,
+        itemBuilder: (context, index) {
+          final photo = _localPhotoRecords[index];
+          return _buildPhotoCard(photo, index);
+        },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _createNewExamination,
+        onPressed: () async {
+          await widget.onAddPhoto();
+          _localPhotoRecords = await widget.fetchPhotoRecords();
+          setState(() {});
+        },
         backgroundColor: _primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -634,159 +1345,257 @@ class _OrtopedPageState extends State<OrtopedPage> {
   }
 
   Widget _buildEmptyState() {
-    return ListView(
-      children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.folder_open,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Нет записей осмотров',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Добавьте первое заключение',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await widget.onAddPhoto();
+              _localPhotoRecords = await widget.fetchPhotoRecords();
+              setState(() {});
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Добавить заключение'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoCard(PhotoRecord photo, int index) {
+    final isImage = _isImageFile(photo.imagePath);
+    final fileName = photo.imagePath.split('/').last;
+    final fileExtension = fileName.split('.').last.toUpperCase();
+
+    String displayTitle = 'Заключение ${index + 1}';
+    String displayDate = _formatDate(photo.createdAt);
+    String displayDescription = '';
+
+    if (photo.description != null && photo.description!.contains(' - ')) {
+      final parts = photo.description!.split(' - ');
+      if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        displayTitle = parts[0];
+      }
+      if (parts.length > 1 && parts[1].isNotEmpty) {
+        displayDate = parts[1];
+      }
+      if (parts.length > 2 && parts[2].isNotEmpty) {
+        displayDescription = parts[2];
+      }
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => widget.onViewFile(photo),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(32),
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
-                  color: _lightColor,
-                  shape: BoxShape.circle,
+                  color: isImage ? _lightColor : _yellowColor.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.medical_services_outlined,
-                  size: 64,
-                  color: _primaryColor,
+                child: isImage
+                    ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    File(photo.imagePath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.broken_image,
+                      color: Colors.grey.shade400,
+                      size: 30,
+                    ),
+                  ),
+                )
+                    : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _getFileIcon(fileExtension),
+                        color: _primaryColor,
+                        size: 24,
+                      ),
+                      Text(
+                        fileExtension,
+                        style: const TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: _primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Нет записей осмотров',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey,
+              const SizedBox(width: 16),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayTitle,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      displayDate,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (displayDescription.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        displayDescription,
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          isImage ? Icons.image : Icons.insert_drive_file,
+                          size: 16,
+                          color: Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isImage ? 'Изображение' : 'Документ',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Нажмите + чтобы создать первый осмотр',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
+
+              PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == 'view') {
+                    widget.onViewFile(photo);
+                  } else if (value == 'delete') {
+                    await widget.onDeletePhoto(photo.id!);
+                    _localPhotoRecords = await widget.fetchPhotoRecords();
+                    setState(() {});
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'view',
+                    child: Row(
+                      children: [
+                        Icon(Icons.visibility, size: 18),
+                        SizedBox(width: 8),
+                        Text('Просмотр'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Удалить', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.more_vert,
+                    color: Colors.grey.shade600,
+                    size: 20,
+                  ),
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildExaminationsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _examinations.length,
-      itemBuilder: (context, index) {
-        final examination = _examinations[index];
-        final photos = _photoRecords[examination.id] ?? [];
+  IconData _getFileIcon(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return Icons.image;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ExpansionTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _lightColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.medical_services,
-                color: _primaryColor,
-              ),
-            ),
-            title: Text(
-              'Прием ${index + 1}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
-            ),
-            subtitle: Text(
-              'Создан: ${_formatDate(examination.createdAt)}\n'
-                  'Файлов: ${photos.length}',
-              style: const TextStyle(fontSize: 12),
-            ),
-            trailing: PopupMenuButton(
-              icon: const Icon(Icons.more_vert),
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'add_photo',
-                  child: Row(
-                    children: [
-                      Icon(Icons.add_photo_alternate, color: _primaryColor),
-                      SizedBox(width: 8),
-                      Text('Добавить файл'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Удалить осмотр'),
-                    ],
-                  ),
-                ),
-              ],
-              onSelected: (value) {
-                if (value == 'add_photo' && examination.id != null) {
-                  _addPhotoToExamination(examination.id!);
-                } else if (value == 'delete' && examination.id != null) {
-                  _deleteExamination(examination.id!);
-                }
-              },
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.folder_open, color: _primaryColor),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Картотека заключений',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (examination.id != null)
-                          IconButton(
-                            onPressed: () => _addPhotoToExamination(examination.id!),
-                            icon: const Icon(Icons.add, color: _primaryColor),
-                            tooltip: 'Добавить файл',
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildPhotoGrid(photos, examination.id ?? 0),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  bool _isImageFile(String filePath) {
+    final extension = filePath.toLowerCase().split('.').last;
+    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension);
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 }

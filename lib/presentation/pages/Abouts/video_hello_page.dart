@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+import '../../../assets/colors/app_colors.dart';
 
 class VideoHelloPage extends StatefulWidget {
   const VideoHelloPage({Key? key}) : super(key: key);
@@ -11,12 +12,12 @@ class VideoHelloPage extends StatefulWidget {
 
 class _VideoHelloPageState extends State<VideoHelloPage> {
   // Цвета
-  static const Color primaryColor = Color(0xFF0A3D91);
-  static const Color secondaryColor = Color(0xFF1565C0);
-  static const Color thirdColor = Colors.white;
-  static const Color mainTitleColor = secondaryColor;
-  static const Color text1Color = Color(0xFF1E88E5);
-  static const Color text2Color = Color(0xFF0D47A1);
+  // static const Color primaryColor = Color(0xFF0A3D91);
+  // static const Color secondaryColor = Color(0xFF1565C0);
+  // static const Color thirdColor = Colors.white;
+  // static const Color mainTitleColor = secondaryColor;
+  // static const Color text1Color = Color(0xFF1E88E5);
+  // static const Color text2Color = Color(0xFF0D47A1);
 
   late VideoPlayerController _controller;
   bool _isLoading = true;
@@ -110,7 +111,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: primaryColor,
+        backgroundColor: AppColors.primaryColor,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -139,7 +140,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [primaryColor, secondaryColor],
+          colors: [AppColors.primaryColor, AppColors.secondryColor],
         ),
       ),
       child: const Center(
@@ -147,14 +148,14 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(thirdColor),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.thirdColor),
               strokeWidth: 3,
             ),
             SizedBox(height: 20),
             Text(
               'Загрузка видео...',
               style: TextStyle(
-                color: thirdColor,
+                color: AppColors.thirdColor,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -171,7 +172,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [primaryColor, secondaryColor],
+          colors: [AppColors.primaryColor, AppColors.secondryColor],
         ),
       ),
       child: Center(
@@ -189,7 +190,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
               const Text(
                 'Ошибка загрузки видео',
                 style: TextStyle(
-                  color: thirdColor,
+                  color: AppColors.thirdColor,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -199,7 +200,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
               Text(
                 _errorMessage ?? 'Неизвестная ошибка',
                 style: TextStyle(
-                  color: thirdColor.withOpacity(0.8),
+                  color: AppColors.thirdColor.withOpacity(0.8),
                   fontSize: 14,
                 ),
                 textAlign: TextAlign.center,
@@ -216,8 +217,8 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Попробовать снова'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: text1Color,
-                  foregroundColor: thirdColor,
+                  backgroundColor: AppColors.text1Color,
+                  foregroundColor: AppColors.thirdColor,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
@@ -284,7 +285,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.black,
-                    primaryColor.withOpacity(0.1),
+                    AppColors.primaryColor.withOpacity(0.1),
                   ],
                 ),
               ),
@@ -329,7 +330,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
             icon: Icon(
               _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
               size: 48,
-              color: thirdColor,
+              color: AppColors.thirdColor,
             ),
             padding: const EdgeInsets.all(20),
           ),
@@ -346,7 +347,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
           Text(
             _formatDuration(_controller.value.position),
             style: TextStyle(
-              color: thirdColor.withOpacity(0.8),
+              color: AppColors.thirdColor.withOpacity(0.8),
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -366,10 +367,10 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
               ),
               child: SliderTheme(
                 data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: text1Color,
-                  inactiveTrackColor: thirdColor.withOpacity(0.2),
-                  thumbColor: text1Color,
-                  overlayColor: text1Color.withOpacity(0.2),
+                  activeTrackColor: AppColors.text1Color,
+                  inactiveTrackColor: AppColors.thirdColor.withOpacity(0.2),
+                  thumbColor: AppColors.text1Color,
+                  overlayColor: AppColors.text1Color.withOpacity(0.2),
                   thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
                   trackHeight: 4,
                 ),
@@ -387,7 +388,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
           Text(
             _formatDuration(_controller.value.duration),
             style: TextStyle(
-              color: thirdColor.withOpacity(0.8),
+              color: AppColors.thirdColor.withOpacity(0.8),
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -440,7 +441,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
       children: [
         Container(
           decoration: BoxDecoration(
-            color: isMain ? text1Color : Colors.black.withOpacity(0.6),
+            color: isMain ? AppColors.text1Color : Colors.black.withOpacity(0.6),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -454,7 +455,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
             onPressed: onPressed,
             icon: Icon(
               icon,
-              color: thirdColor,
+              color: AppColors.thirdColor,
               size: isMain ? 28 : 22,
             ),
             padding: EdgeInsets.all(isMain ? 16 : 12),
@@ -464,7 +465,7 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
         Text(
           label,
           style: TextStyle(
-            color: thirdColor.withOpacity(0.7),
+            color: AppColors.thirdColor.withOpacity(0.7),
             fontSize: 10,
             fontWeight: FontWeight.w500,
           ),

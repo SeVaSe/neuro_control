@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Основные цвета
-  static const Color primaryColor = Color(0xFF0A3D91); // глубокий синий
-  static const Color secondryColor = Color(0xFF1565C0); // яркий синий
+  static const Color primaryColor = Color(0xFF135A3E); // глубокий синий
+  static const Color secondryColor = Color(0xff12956f); // яркий синий
   static const Color thirdColor = Colors.white; // белый
 
   // Цвета текстов
   static const Color mainTitleColor = secondryColor; // заголовки
-  static const Color text1Color = Color(0xFF1E88E5); // голубой для акцентов
-  static const Color text2Color = Color(0xFF0D47A1); // насыщенный синий
+  static const Color text1Color = Color(0xff2d9c95); // голубой для акцентов
+  static const Color text2Color = Color(0xFF10756D); // насыщенный синий
 
   // Цвета ошибок/предупреждений
   static const Color errorColor = Color(0xFFD32F2F); // насыщенный красный

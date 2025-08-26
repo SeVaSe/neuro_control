@@ -20,28 +20,39 @@ class DensitometrPage extends StatefulWidget {
   State<DensitometrPage> createState() => _DensitometrPageState();
 }
 
-class _DensitometrPageState extends State<DensitometrPage> {
+class _DensitometrPageState extends State<DensitometrPage>
+    with SingleTickerProviderStateMixin {
   final DatabaseService _databaseService = DatabaseService();
   final ImagePicker _imagePicker = ImagePicker();
-  final TextEditingController _descriptionController = TextEditingController();
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   GMFCS? _gmfcs;
   List<Densitometry> _densitometries = [];
   bool _isLoading = true;
   bool _isUploading = false;
 
-  static const Color primaryColor = Color(0xFF4ECDC4);
-  static const Color lightColor = Color(0xFFE8FFFD);
+  static const Color primaryColor = Color(0xFF26A66C);
+  static const Color lightColor = Color(0xFFE8FFF4);
+  static const Color yellowColor = Color(0xFFFFC107);
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
     _loadData();
+    _animationController.forward();
   }
 
   @override
   void dispose() {
-    _descriptionController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -85,335 +96,262 @@ class _DensitometrPageState extends State<DensitometrPage> {
     );
   }
 
-  Future<void> _pickImage() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
-      );
+  Future<void> _addDensitometryFile() async {
+    final sourceType = await _showImageSourceDialog();
+    if (sourceType == null) return;
 
-      if (image != null) {
-        _showAddDescriptionDialog(image.path);
+    try {
+      String? filePath;
+
+      if (sourceType == 'camera') {
+        final XFile? image = await _imagePicker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
+        );
+        filePath = image?.path;
+      } else if (sourceType == 'gallery') {
+        final XFile? image = await _imagePicker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 85,
+        );
+        filePath = image?.path;
+      } else if (sourceType == 'file') {
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+          allowMultiple: false,
+        );
+        filePath = result?.files.single.path;
+      }
+
+      if (filePath != null) {
+        final fileInfo = await _showFileInfoDialog();
+        if (fileInfo != null) {
+          setState(() => _isUploading = true);
+
+          await _databaseService.addDensitometry(
+            widget.patientId,
+            filePath,
+            description: '${fileInfo['title']} - ${fileInfo['date']} - ${fileInfo['description']}',
+          );
+
+          await _loadData();
+          _showSuccessSnackBar('Заключение денситометрии сохранено');
+        }
       }
     } catch (e) {
-      _showErrorSnackBar('Ошибка при съемке: $e');
+      _showErrorSnackBar('Ошибка добавления файла: $e');
+    } finally {
+      setState(() => _isUploading = false);
     }
   }
 
-  Future<void> _pickFromGallery() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        _showAddDescriptionDialog(image.path);
-      }
-    } catch (e) {
-      _showErrorSnackBar('Ошибка при выборе изображения: $e');
-    }
-  }
-
-  Future<void> _pickFile() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'txt'],
-      );
-
-      if (result != null && result.files.single.path != null) {
-        _showAddDescriptionDialog(result.files.single.path!);
-      }
-    } catch (e) {
-      _showErrorSnackBar('Ошибка при выборе файла: $e');
-    }
-  }
-
-  void _showAddDescriptionDialog(String filePath) {
-    _descriptionController.clear();
-
-    showDialog(
+  Future<String?> _showImageSourceDialog() async {
+    return await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: lightColor,
         title: const Text(
-          'Добавить описание',
-          style: TextStyle(fontWeight: FontWeight.w600),
+          'Выберите источник',
+          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _buildFilePreview(filePath),
-            ),
-            const SizedBox(height: 16),
+            _buildSourceOption(Icons.camera_alt, 'Камера', 'camera'),
+            _buildSourceOption(Icons.photo_library, 'Галерея', 'gallery'),
+            _buildSourceOption(Icons.insert_drive_file, 'Файл', 'file'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourceOption(IconData icon, String title, String value) {
+    return ListTile(
+      leading: Icon(icon, color: primaryColor),
+      title: Text(title, style: const TextStyle(color: primaryColor)),
+      onTap: () => Navigator.pop(context, value),
+    );
+  }
+
+  Future<Map<String, String>?> _showFileInfoDialog() async {
+    final TextEditingController titleController = TextEditingController(
+      text: 'Заключение денситометрии',
+    );
+    final TextEditingController descriptionController = TextEditingController();
+    final TextEditingController dateController = TextEditingController(
+      text: _formatDate(DateTime.now()),
+    );
+
+    return await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: lightColor,
+        title: const Text(
+          'Информация о заключении',
+          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                labelText: 'Описание (необязательно)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              controller: titleController,
+              decoration: const InputDecoration(
+                labelText: 'Название',
+                hintText: 'Например: Заключение денситометрии',
+                border: OutlineInputBorder(),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: primaryColor, width: 2),
+                  borderSide: BorderSide(color: primaryColor),
                 ),
               ),
-              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: dateController,
+              decoration: const InputDecoration(
+                labelText: 'Дата',
+                border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: primaryColor),
+                ),
+              ),
+              readOnly: true,
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (date != null) {
+                  dateController.text = _formatDate(date);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Описание',
+                hintText: 'Дополнительная информация',
+                border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: primaryColor),
+                ),
+              ),
+              maxLines: 2,
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Отмена',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
+            child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
-              _saveDensitometry(filePath, _descriptionController.text.trim());
+              if (titleController.text.trim().isNotEmpty) {
+                Navigator.pop(context, {
+                  'title': titleController.text.trim(),
+                  'date': dateController.text,
+                  'description': descriptionController.text.trim(),
+                });
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              foregroundColor: Colors.white,
             ),
-            child: const Text(
-              'Сохранить',
-              style: TextStyle(color: Colors.white),
-            ),
+            child: const Text('Сохранить'),
           ),
         ],
       ),
     );
-  }
-
-  Widget _buildFilePreview(String filePath) {
-    final extension = filePath.split('.').last.toLowerCase();
-
-    if (['jpg', 'jpeg', 'png'].contains(extension)) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.file(
-          File(filePath),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildFileIcon(extension),
-        ),
-      );
-    } else {
-      return _buildFileIcon(extension);
-    }
-  }
-
-  Widget _buildFileIcon(String extension) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            _getFileIcon(extension),
-            size: 48,
-            color: primaryColor,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            extension.toUpperCase(),
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData _getFileIcon(String extension) {
-    switch (extension) {
-      case 'pdf':
-        return Icons.picture_as_pdf;
-      case 'doc':
-      case 'docx':
-        return Icons.description;
-      case 'txt':
-        return Icons.text_snippet;
-      default:
-        return Icons.insert_drive_file;
-    }
-  }
-
-  Future<void> _saveDensitometry(String filePath, String description) async {
-    setState(() => _isUploading = true);
-
-    try {
-      await _databaseService.addDensitometry(
-        widget.patientId,
-        filePath,
-        description: description.isEmpty ? null : description,
-      );
-
-      _showSuccessSnackBar('Файл успешно сохранен');
-      await _loadData();
-    } catch (e) {
-      _showErrorSnackBar('Ошибка сохранения: $e');
-    } finally {
-      setState(() => _isUploading = false);
-    }
   }
 
   Future<void> _deleteDensitometry(Densitometry densitometry) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Подтверждение удаления',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        content: const Text('Вы уверены, что хотите удалить этот файл из картотеки?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Отмена',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Удалить',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await _showConfirmDialog(
+      'Удалить заключение?',
+      'Это действие нельзя отменить',
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       try {
         await _databaseService.deleteDensitometry(densitometry.id!);
-        _showSuccessSnackBar('Файл удален из картотеки');
         await _loadData();
+        _showSuccessSnackBar('Заключение удалено');
       } catch (e) {
         _showErrorSnackBar('Ошибка удаления: $e');
       }
     }
   }
 
-  void _showFileOptions() {
-    showModalBottomSheet(
+  Future<bool> _showConfirmDialog(String title, String content) async {
+    final result = await showDialog<bool>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: Colors.white,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
+      builder: (context) => AlertDialog(
+        backgroundColor: lightColor,
+        title: Text(title, style: const TextStyle(color: primaryColor)),
+        content: Text(content, style: const TextStyle(color: primaryColor)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Добавить файл в картотеку',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildOptionTile(
-              icon: Icons.camera_alt,
-              title: 'Сфотографировать',
-              subtitle: 'Сделать снимок камерой',
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage();
-              },
-            ),
-            _buildOptionTile(
-              icon: Icons.photo_library,
-              title: 'Выбрать из галереи',
-              subtitle: 'Выбрать изображение',
-              onTap: () {
-                Navigator.pop(context);
-                _pickFromGallery();
-              },
-            ),
-            _buildOptionTile(
-              icon: Icons.attach_file,
-              title: 'Выбрать файл',
-              subtitle: 'PDF, DOC, изображения',
-              onTap: () {
-                Navigator.pop(context);
-                _pickFile();
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
-        ),
+            child: const Text('Удалить'),
+          ),
+        ],
       ),
     );
+    return result ?? false;
   }
 
-  Widget _buildOptionTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: lightColor,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: primaryColor, size: 24),
+  void _navigateToFolder() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _DensitometryFolderPage(
+          densitometries: _densitometries,
+          onAddFile: _addDensitometryFile,
+          onDeleteFile: _deleteDensitometry,
+          onViewFile: _viewFile,
+          fetchDensitometries: () async {
+            return await _databaseService.getDensitometries(widget.patientId);
+          },
         ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-        ),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        tileColor: Colors.grey.shade50,
       ),
-    );
+    ).then((_) {
+      _loadData();
+    });
+  }
+
+  void _viewFile(Densitometry densitometry) async {
+    final file = File(densitometry.imagePath);
+
+    if (!file.existsSync()) {
+      _showErrorSnackBar('Файл не найден');
+      return;
+    }
+
+    try {
+      final result = await OpenFile.open(densitometry.imagePath);
+      if (result.type != ResultType.done) {
+        _showErrorSnackBar('Не удалось открыть файл: ${result.message}');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Ошибка открытия файла: $e');
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
   @override
@@ -434,831 +372,112 @@ class _DensitometrPageState extends State<DensitometrPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.help_outline,
+              color: Colors.white,
+              size: 24,
+            ),
+            onPressed: () {
+              // Заглушка - пока просто показываем снэкбар
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Справка по денситометрии'),
+                  backgroundColor: primaryColor,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+        ],
+
       ),
       body: _isLoading
           ? const Center(
         child: CircularProgressIndicator(color: primaryColor),
       )
-          : RefreshIndicator(
-        onRefresh: _loadData,
-        color: primaryColor,
+          : FadeTransition(
+        opacity: _fadeAnimation,
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildGMFCSCard(),
-              const SizedBox(height: 20),
               _buildRecommendationCard(),
               if (_needsDensitometry) ...[
                 const SizedBox(height: 20),
-                _buildFileSection(),
+                _buildActionCards(),
               ],
+              const SizedBox(height: 20),
             ],
           ),
-        ),
-      ),
-      floatingActionButton: _needsDensitometry
-          ? FloatingActionButton.extended(
-        onPressed: _isUploading ? null : _showFileOptions,
-        backgroundColor: primaryColor,
-        icon: _isUploading
-            ? const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            color: Colors.white,
-            strokeWidth: 2,
-          ),
-        )
-            : const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Добавить',
-          style: TextStyle(color: Colors.white),
-        ),
-      )
-          : null,
-    );
-  }
-
-  Widget _buildGMFCSCard() {
-    return Card(
-      elevation: 3,
-      shadowColor: primaryColor.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [lightColor, Colors.white],
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.assessment,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Text(
-                    'Уровень GMFCS',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_gmfcs != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: _needsDensitometry
-                      ? Colors.orange.withOpacity(0.1)
-                      : Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _needsDensitometry ? Colors.orange : Colors.green,
-                    width: 2,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _needsDensitometry ? Icons.warning : Icons.check_circle,
-                      color: _needsDensitometry ? Colors.orange : Colors.green,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Уровень ${_gmfcs!.level}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _needsDensitometry ? Colors.orange[700] : Colors.green[700],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.help_outline, color: Colors.grey.shade600),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Уровень GMFCS не определен',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
         ),
       ),
     );
   }
 
   Widget _buildRecommendationCard() {
-    if (!_needsDensitometry) {
-      return Card(
-        elevation: 3,
-        shadowColor: Colors.green.withOpacity(0.3),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              colors: [
-                Colors.green.withOpacity(0.1),
-                Colors.green.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle,
-                  size: 48,
-                  color: Colors.green[600],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Денситометрия не требуется',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.green[700],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withOpacity(0.3)),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'Клиническое заключение:',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green[700],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'При текущем уровне функциональной классификации GMFCS (${_gmfcs?.level ?? 'не определен'}) проведение денситометрического исследования не показано. Минеральная плотность костной ткани соответствует возрастной норме для данной категории пациентов.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.green[600],
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Card(
-      elevation: 3,
-      shadowColor: Colors.orange.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [
-              Colors.orange.withOpacity(0.1),
-              Colors.orange.withOpacity(0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.medical_services,
-                size: 48,
-                color: Colors.orange[600],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Рекомендована денситометрия',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.orange[700],
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'Медицинское показание:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.orange[700],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Пациенту с уровнем GMFCS ${_gmfcs?.level} показано проведение денситометрического исследования для оценки минеральной плотности костной ткани и раннего выявления остеопенических изменений.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.orange[600],
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFileSection() {
-    return Card(
-      elevation: 3,
-      shadowColor: primaryColor.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.folder_open,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Text(
-                    'Картотека денситометрии',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: lightColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_densitometries.length}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: primaryColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (_densitometries.isEmpty) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.withOpacity(0.2), style: BorderStyle.solid),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.folder_open,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Картотека пуста',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Добавьте результаты денситометрического исследования для ведения медицинской документации',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _densitometries.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final densitometry = _densitometries[index];
-                  return _buildDensitometryItem(densitometry);
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDensitometryItem(Densitometry densitometry) {
-    final extension = densitometry.imagePath.split('.').last.toLowerCase();
-    final isImage = ['jpg', 'jpeg', 'png'].contains(extension);
-    final fileName = densitometry.imagePath.split('/').last;
+    final level = _gmfcs?.level ?? 0;
+    final needsDensitometry = level >= 4;
 
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: lightColor,
-          ),
-          child: isImage
-              ? ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.file(
-              File(densitometry.imagePath),
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  _buildFileIcon(extension),
-            ),
-          )
-              : _buildFileIcon(extension),
-        ),
-        title: Text(
-          fileName,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (densitometry.description != null && densitometry.description!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                densitometry.description!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(
-                  Icons.access_time,
-                  size: 12,
-                  color: Colors.grey[500],
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  DateFormat('dd.MM.yyyy в HH:mm').format(densitometry.createdAt),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        trailing: PopupMenuButton(
-          icon: Icon(Icons.more_vert, color: Colors.grey[600]),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'open',
-              child: Row(
-                children: [
-                  Icon(Icons.open_in_new, color: primaryColor, size: 20),
-                  const SizedBox(width: 8),
-                  const Text('Открыть'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'view',
-              child: Row(
-                children: [
-                  Icon(Icons.visibility, color: Colors.blue, size: 20),
-                  const SizedBox(width: 8),
-                  const Text('Просмотр'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, color: Colors.red[600], size: 20),
-                  const SizedBox(width: 8),
-                  const Text('Удалить'),
-                ],
-              ),
-            ),
-          ],
-          onSelected: (value) {
-            if (value == 'open') {
-              _openFileExternally(densitometry);
-            } else if (value == 'view') {
-              _showFilePreview(densitometry);
-            } else if (value == 'delete') {
-              _deleteDensitometry(densitometry);
-            }
-          },
-        ),
-        onTap: () => _openFileExternally(densitometry),
-      ),
-    );
-  }
-
-  void _showFilePreview(Densitometry densitometry) {
-    final extension = densitometry.imagePath.split('.').last.toLowerCase();
-    final isImage = ['jpg', 'jpeg', 'png'].contains(extension);
-    final fileName = densitometry.imagePath.split('/').last;
-
-    if (isImage) {
-      // Для изображений показываем в диалоге
-      _showImageDialog(densitometry, fileName);
-    } else {
-      // Для других файлов открываем во внешнем приложении
-      _openFileExternally(densitometry);
-    }
-  }
-
-  void _showImageDialog(Densitometry densitometry, String fileName) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.85,
-            maxWidth: MediaQuery.of(context).size.width * 0.95,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: primaryColor,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        fileName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.open_in_new, color: Colors.white),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _openFileExternally(densitometry);
-                      },
-                      tooltip: 'Открыть во внешнем приложении',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Flexible(
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(densitometry.imagePath),
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildErrorWidget('Ошибка загрузки изображения'),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Description and date
-              if (densitometry.description != null && densitometry.description!.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: lightColor.withOpacity(0.5),
-                    border: Border(
-                      top: BorderSide(color: Colors.grey.withOpacity(0.2)),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Описание:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        densitometry.description!,
-                        style: const TextStyle(fontSize: 14, height: 1.4),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Footer with date and open button
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.05),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.access_time,
-                      size: 16,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Добавлено: ${DateFormat('dd.MM.yyyy в HH:mm').format(densitometry.createdAt)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _openFileExternally(densitometry);
-                      },
-                      icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text('Открыть'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        color: needsDensitometry ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: needsDensitometry ? Colors.orange : Colors.green,
+          width: 2,
         ),
       ),
-    );
-  }
-
-  Future<void> _openFileExternally(Densitometry densitometry) async {
-    try {
-      final file = File(densitometry.imagePath);
-
-      // Проверяем, существует ли файл
-      if (!await file.exists()) {
-        _showErrorSnackBar('Файл не найден: ${densitometry.imagePath}');
-        return;
-      }
-
-      // Показываем индикатор загрузки
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(color: primaryColor),
-        ),
-      );
-
-      // Открываем файл
-      final result = await OpenFile.open(densitometry.imagePath);
-
-      // Закрываем индикатор загрузки
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-
-      // Обрабатываем результат
-      if (result.type != ResultType.done) {
-        String errorMessage;
-        switch (result.type) {
-          case ResultType.noAppToOpen:
-            errorMessage = 'Нет приложения для открытия этого типа файлов';
-            break;
-          case ResultType.fileNotFound:
-            errorMessage = 'Файл не найден';
-            break;
-          case ResultType.permissionDenied:
-            errorMessage = 'Нет разрешения на открытие файла';
-            break;
-          default:
-            errorMessage = 'Не удалось открыть файл: ${result.message}';
-        }
-        _showErrorSnackBar(errorMessage);
-      }
-    } catch (e) {
-      // Закрываем индикатор загрузки в случае ошибки
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-      _showErrorSnackBar('Ошибка при открытии файла: $e');
-    }
-  }
-
-  Widget _buildFilePreviewWidget(String extension, String fileName) {
-    return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: lightColor,
+              color: needsDensitometry ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              _getFileIcon(extension),
-              size: 64,
-              color: primaryColor,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            fileName,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: lightColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              extension.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: primaryColor,
-              ),
+              needsDensitometry ? Icons.medical_services : Icons.check_circle,
+              size: 48,
+              color: needsDensitometry ? Colors.orange[600] : Colors.green[600],
             ),
           ),
           const SizedBox(height: 16),
           Text(
-            'Файл сохранен в картотеке',
+            needsDensitometry
+                ? 'Необходимо проведение денситометрии, начиная с 5 лет, раз в 2 года'
+                : 'Не нужно проводить, учитывая, что у вашего ребенка $level уровень',
             style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: needsDensitometry ? Colors.orange[700] : Colors.green[700],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: needsDensitometry ? Colors.orange.withOpacity(0.3) : Colors.green.withOpacity(0.3),
+              ),
+            ),
+            child: Text(
+              needsDensitometry
+                  ? 'При уровне GMFCS $level рекомендуется регулярное проведение денситометрии для контроля минеральной плотности костной ткани и профилактики остеопороза.'
+                  : 'При уровне GMFCS $level риск развития остеопороза минимален, поэтому специальные исследования костной плотности не требуются.',
+              style: TextStyle(
+                fontSize: 14,
+                color: needsDensitometry ? Colors.orange[600] : Colors.green[600],
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
         ],
@@ -1266,27 +485,436 @@ class _DensitometrPageState extends State<DensitometrPage> {
     );
   }
 
-  Widget _buildErrorWidget(String message) {
+  Widget _buildActionCards() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: _isUploading ? null : _addDensitometryFile,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: primaryColor,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                _isUploading
+                    ? const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                )
+                    : const Icon(
+                  Icons.add_a_photo,
+                  color: Colors.white,
+                  size: 48,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _isUploading ? 'Сохранение...' : 'Добавить заключение',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Сфотографировать или загрузить файл',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: _navigateToFolder,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: yellowColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: yellowColor.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.folder,
+                  color: Colors.white,
+                  size: 36,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Папка денситометрии',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_densitometries.length} заключений',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+}
+
+// Страница папки денситометрии
+class _DensitometryFolderPage extends StatefulWidget {
+  final List<Densitometry> densitometries;
+  final Future<void> Function() onAddFile;
+  final Future<void> Function(Densitometry) onDeleteFile;
+  final Function(Densitometry) onViewFile;
+  final Future<List<Densitometry>> Function() fetchDensitometries;
+
+  const _DensitometryFolderPage({
+    required this.densitometries,
+    required this.onAddFile,
+    required this.onDeleteFile,
+    required this.onViewFile,
+    required this.fetchDensitometries,
+  });
+
+  @override
+  State<_DensitometryFolderPage> createState() => _DensitometryFolderPageState();
+}
+
+class _DensitometryFolderPageState extends State<_DensitometryFolderPage> {
+  static const Color primaryColor = Color(0xFF26A66C);
+  static const Color lightColor = Color(0xFFE8FFF4);
+  static const Color yellowColor = Color(0xFFFFC107);
+
+  late List<Densitometry> _localDensitometries;
+
+  @override
+  void initState() {
+    super.initState();
+    _localDensitometries = widget.densitometries;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
+        title: const Text('Папка денситометрии'),
+        elevation: 0,
+      ),
+      body: _localDensitometries.isEmpty
+          ? _buildEmptyState()
+          : ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _localDensitometries.length,
+        itemBuilder: (context, index) {
+          final densitometry = _localDensitometries[index];
+          return _buildDensitometryCard(densitometry, index);
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await widget.onAddFile();
+          _localDensitometries = await widget.fetchDensitometries();
+          setState(() {});
+        },
+        backgroundColor: primaryColor,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red[400],
+            Icons.folder_open,
+            size: 80,
+            color: Colors.grey.shade400,
           ),
           const SizedBox(height: 16),
           Text(
-            message,
+            'Нет заключений денситометрии',
             style: TextStyle(
-              fontSize: 16,
-              color: Colors.red[600],
+              fontSize: 18,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
             ),
-            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Добавьте первое заключение',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await widget.onAddFile();
+              _localDensitometries = await widget.fetchDensitometries();
+              setState(() {});
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Добавить заключение'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildDensitometryCard(Densitometry densitometry, int index) {
+    final isImage = _isImageFile(densitometry.imagePath);
+    final fileName = densitometry.imagePath.split('/').last;
+    final fileExtension = fileName.split('.').last.toUpperCase();
+
+    String displayTitle = 'Заключение денситометрии ${index + 1}';
+    String displayDate = DateFormat('dd.MM.yyyy').format(densitometry.createdAt);
+    String displayDescription = '';
+
+    if (densitometry.description != null && densitometry.description!.contains(' - ')) {
+      final parts = densitometry.description!.split(' - ');
+      if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        displayTitle = parts[0];
+      }
+      if (parts.length > 1 && parts[1].isNotEmpty) {
+        displayDate = parts[1];
+      }
+      if (parts.length > 2 && parts[2].isNotEmpty) {
+        displayDescription = parts[2];
+      }
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => widget.onViewFile(densitometry),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: isImage ? lightColor : yellowColor.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: isImage
+                    ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    File(densitometry.imagePath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.broken_image,
+                      color: Colors.grey.shade400,
+                      size: 30,
+                    ),
+                  ),
+                )
+                    : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _getFileIcon(fileExtension),
+                        color: primaryColor,
+                        size: 24,
+                      ),
+                      Text(
+                        fileExtension,
+                        style: const TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayTitle,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      displayDate,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (displayDescription.isNotEmpty) ...[const SizedBox(height: 4),
+                      Text(
+                        displayDescription,
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          isImage ? Icons.image : Icons.insert_drive_file,
+                          size: 16,
+                          color: Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isImage ? 'Изображение' : 'Документ',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == 'view') {
+                    widget.onViewFile(densitometry);
+                  } else if (value == 'delete') {
+                    await widget.onDeleteFile(densitometry);
+                    _localDensitometries = await widget.fetchDensitometries();
+                    setState(() {});
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'view',
+                    child: Row(
+                      children: [
+                        Icon(Icons.visibility, size: 18),
+                        SizedBox(width: 8),
+                        Text('Просмотр'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Удалить', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.more_vert,
+                    color: Colors.grey.shade600,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getFileIcon(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return Icons.image;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+
+  bool _isImageFile(String filePath) {
+    final extension = filePath.toLowerCase().split('.').last;
+    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension);
   }
 }

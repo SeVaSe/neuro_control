@@ -1,1764 +1,533 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:add_2_calendar/add_2_calendar.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file/open_file.dart';
+import 'package:add_2_calendar/add_2_calendar.dart';
 import 'dart:io';
 
 import '../../../database/entities/xray_image.dart';
-import '../../../database/entities/xray_chart.dart';
-import '../../../database/entities/gmfcs.dart';
 import '../../../services/database_service.dart';
 
 class RentgenPage extends StatefulWidget {
-  final int orthopedicExaminationId;
   final String patientId;
+  final String patientName;
 
   const RentgenPage({
     Key? key,
-    required this.orthopedicExaminationId,
     required this.patientId,
+    required this.patientName,
   }) : super(key: key);
 
   @override
   State<RentgenPage> createState() => _RentgenPageState();
 }
 
-class _RentgenPageState extends State<RentgenPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _RentgenPageState extends State<RentgenPage>
+    with SingleTickerProviderStateMixin {
   final DatabaseService _databaseService = DatabaseService();
-  List<XrayImage> _xrayImages = [];
-  List<XrayChart> _xrayCharts = [];
-  GMFCS? _gmfcs;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
+  List<XrayImage> _allXrayImages = [];
   bool _isLoading = false;
-  String _searchQuery = '';
-  String _selectedFilter = 'Все';
-  int _currentTabIndex = 0;
-
-  // Переменные для опроса
   int? _patientAge;
-  bool _xrayAt2Yes = false;
-  bool _xrayAt2No = false;
-  bool _xrayAt6Yes = false;
-  bool _xrayAt6No = false;
-  bool _xrayAt10Yes = false;
-  bool _xrayAt10No = false;
-  bool _isShowingSurvey = false;
+  int? _gmfcsLevel;
 
-  // Контроллер и ошибка для поля возраста
-  final TextEditingController _ageController = TextEditingController();
-  String? _ageErrorText;
+  static const Color _primaryColor = Color(0xFFFF974D);
+  static const Color _lightColor = Color(0xFFFFF1E6);
+  static const Color _yellowColor = Color(0xFFFFC107);
+  static const Color _whiteColor = Colors.white;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() {
-          _currentTabIndex = _tabController.index;
-        });
-      }
-    });
-
-    _ageController.addListener(() {
-      final text = _ageController.text;
-      final parsedAge = int.tryParse(text);
-      setState(() {
-        if (text.isEmpty) {
-          _ageErrorText = null;
-          _patientAge = null;
-        } else if (parsedAge == null) {
-          _ageErrorText = 'Введите число';
-          _patientAge = null;
-        } else if (parsedAge < 0 || parsedAge > 18) {
-          _ageErrorText = 'Возраст должен быть от 0 до 18 лет';
-          _patientAge = null;
-        } else {
-          _ageErrorText = null;
-          _patientAge = parsedAge;
-        }
-        _resetXrayAnswers();
-      });
-    });
-
-    _loadData();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+    _loadXrayImages();
+    _loadPatientData();
+    _animationController.forward();
   }
 
   @override
   void dispose() {
-    _ageController.dispose();
-    _tabController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+  Future<void> _loadPatientData() async {
     try {
-      final images = await _databaseService.getXrayImages(widget.orthopedicExaminationId);
-      final charts = await _databaseService.getXrayCharts(widget.orthopedicExaminationId);
-      charts.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      final gmfcs = await _databaseService.getGMFCS(widget.patientId);
+      // Загружаем дату рождения
+      final birthDateRecord = await _databaseService.getPatientBirthDate(widget.patientId);
+      if (birthDateRecord != null) {
+        final age = _calculateAge(birthDateRecord.birthDate);
+        setState(() {
+          _patientAge = age;
+        });
+      }
 
-      setState(() {
-        _xrayImages = images;
-        _xrayCharts = charts;
-        _gmfcs = gmfcs;
-      });
+      // Загружаем GMFCS
+      final gmfcsRecord = await _databaseService.getGMFCS(widget.patientId);
+      if (gmfcsRecord != null) {
+        setState(() {
+          _gmfcsLevel = gmfcsRecord.level;
+        });
+      }
     } catch (e) {
-      _showErrorSnackBar('Ошибка загрузки данных: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      print('Ошибка загрузки данных пациента: $e');
     }
+  }
+
+  int _calculateAge(DateTime birthDate) {
+    final now = DateTime.now();
+    int age = now.year - birthDate.year;
+    if (now.month < birthDate.month ||
+        (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+    return age;
   }
 
   Future<void> _loadXrayImages() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      final images = await _databaseService.getXrayImages(widget.orthopedicExaminationId);
+      final examinations = await _databaseService
+          .getOrthopedicExaminations(widget.patientId);
+
+      List<XrayImage> allXrays = [];
+
+      for (final examination in examinations) {
+        if (examination.id != null) {
+          final xrays =
+          await _databaseService.getXrayImages(examination.id!);
+          allXrays.addAll(xrays);
+        }
+      }
+
+      allXrays.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
       setState(() {
-        _xrayImages = images;
+        _allXrayImages = allXrays;
       });
     } catch (e) {
       _showErrorSnackBar('Ошибка загрузки данных: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  String _determineXraySchedule(int age, String level) {
-    if (level == 'level 1') {
-      return 'Рентген не требуется.';
-    } else if (level == 'level 2') {
-      if (age < 2) {
-        return 'Назначен рентген в 2 и 6 лет.';
-      } else if (age >= 2 && age < 6) {
-        if (!_xrayAt2Yes) {
-          return 'Назначен рентген сейчас и в 6 лет.';
-        }
-        return 'Назначен рентген в 6 лет.';
-      } else if (age >= 6 && age < 10) {
-        if (!_xrayAt2Yes && !_xrayAt6Yes) {
-          return 'Назначен рентген сейчас и в 10 лет.';
-        } else if (_xrayAt2Yes && !_xrayAt6Yes) {
-          return 'Назначен рентген сейчас и в 10 лет.';
-        } else if (!_xrayAt2Yes && _xrayAt6Yes) {
-          return 'Назначен рентген в 10 лет.';
-        }
-        return 'Назначен рентген в 10 лет.';
-      } else if (age >= 10) {
-        if (!_xrayAt10Yes) {
-          return 'Назначен рентген сейчас.';
-        }
-        return 'Все рентгены для вашего уровня выполнены.';
+  // Новый метод, возвращающий актуальный список (используется папкой)
+  Future<List<XrayImage>> _fetchAllXrayImagesForPatient() async {
+    final examinations =
+    await _databaseService.getOrthopedicExaminations(widget.patientId);
+    List<XrayImage> allXrays = [];
+    for (final examination in examinations) {
+      if (examination.id != null) {
+        final xrays = await _databaseService.getXrayImages(examination.id!);
+        allXrays.addAll(xrays);
       }
-    } else if (level == 'level 3' || level == 'level 4' || level == 'level 5') {
-      return 'Назначен ежегодный рентген.';
     }
-    return 'Уровень не определен.';
+    allXrays.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return allXrays;
   }
 
-  bool _areAllQuestionsAnswered(int age, String level) {
-    if (level != 'level 2') return true;
-
-    if (age > 2 && !(_xrayAt2Yes || _xrayAt2No)) return false;
-    if (age >= 6 && !(_xrayAt6Yes || _xrayAt6No)) return false;
-    if (age >= 10 && !(_xrayAt10Yes || _xrayAt10No)) return false;
-
-    return true;
-  }
-
-  Future<void> _saveXraySchedule(String schedule) async {
-    try {
-      await _databaseService.addXrayChart(widget.orthopedicExaminationId, schedule);
-      _showSuccessSnackBar('Расписание рентгена сохранено');
-      await _loadData();
-      setState(() {
-        _isShowingSurvey = false;
-      });
-    } catch (e) {
-      _showErrorSnackBar('Ошибка сохранения: $e');
-    }
-  }
-
-  Widget _buildXrayChart() {
-    if (_isShowingSurvey) {
-      return _buildSurvey();
-    } else if (_xrayCharts.isNotEmpty) {
-      return _buildExistingChart();
-    } else {
-      return _buildNewChart();
-    }
-  }
-
-  Widget _buildExistingChart() {
-    final latestChart = _xrayCharts.last;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFFF6B6B),
-                  const Color(0xFFFF8E8E),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFF6B6B).withOpacity(0.3),
-                  spreadRadius: 2,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                const Icon(
-                  Icons.analytics,
-                  size: 48,
-                  color: Colors.white,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'График рентгенографии',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Создан: ${_formatDate(latestChart.createdAt)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 2,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF6B6B).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.medical_services,
-                        color: Color(0xFFFF6B6B),
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Рекомендации',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFE8E8),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFFFF6B6B).withOpacity(0.3),
-                    ),
-                  ),
-                  child: Text(
-                    latestChart.chartData,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.black87,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _isShowingSurvey = true;
-                  _resetSurveyData();
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B6B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 3,
-              ),
-              icon: const Icon(Icons.refresh),
-              label: const Text(
-                'Пройти опрос заново',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNewChart() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFE8E8),
-              borderRadius: BorderRadius.circular(60),
-              border: Border.all(
-                color: const Color(0xFFFF6B6B).withOpacity(0.3),
-                width: 2,
-              ),
-            ),
-            child: Icon(
-              Icons.analytics_outlined,
-              size: 60,
-              color: const Color(0xFFFF6B6B).withOpacity(0.7),
-            ),
-          ),
-          const SizedBox(height: 32),
-          Text(
-            'График рентгенографии',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Определите индивидуальное расписание\nрентгенологических исследований',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 40),
-          if (_gmfcs != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.only(bottom: 24),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.blue.withOpacity(0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.info_outline,
-                      color: Colors.blue,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Уровень GMFCS',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
-                        ),
-                        Text(
-                          'Уровень ${_gmfcs!.level}',
-                          style: const TextStyle(
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _gmfcs != null
-                  ? () {
-                setState(() {
-                  _isShowingSurvey = true;
-                });
-              }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B6B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 3,
-              ),
-              icon: const Icon(Icons.quiz),
-              label: Text(
-                _gmfcs != null
-                    ? 'Начать опрос'
-                    : 'Необходимо определить уровень GMFCS',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSurvey() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFFF6B6B),
-                  const Color(0xFFFF8E8E),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Column(
-              children: [
-                Icon(
-                  Icons.quiz,
-                  size: 40,
-                  color: Colors.white,
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'Опрос для определения графика',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _buildAgeQuestion(),
-          const SizedBox(height: 24),
-          if (_gmfcs?.level == 2 && _patientAge != null) ..._buildXrayQuestions(),
-          const SizedBox(height: 32),
-          if (_patientAge != null &&
-              _areAllQuestionsAnswered(_patientAge!, 'level ${_gmfcs?.level}'))
-            _buildResult(),
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 80.0), // Отступ для предотвращения перекрытия
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _isShowingSurvey = false;
-                        _resetSurveyData();
-                      });
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFFF6B6B),
-                      side: const BorderSide(color: Color(0xFFFF6B6B)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Отмена'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _patientAge != null &&
-                        _areAllQuestionsAnswered(
-                            _patientAge!, 'level ${_gmfcs?.level}')
-                        ? () {
-                      final schedule = _determineXraySchedule(
-                          _patientAge!, 'level ${_gmfcs?.level}');
-                      _saveXraySchedule(schedule);
-                    }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF6B6B),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Сохранить'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAgeQuestion() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Возраст пациента',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFFFF6B6B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _ageController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              hintText: 'Введите возраст в годах',
-              errorText: _ageErrorText,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFFF6B6B)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFFF6B6B), width: 2),
-              ),
-              prefixIcon: const Icon(
-                Icons.cake,
-                color: Color(0xFFFF6B6B),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildXrayQuestions() {
-    List<Widget> questions = [];
-
-    if (_patientAge! > 2) {
-      questions.add(_buildXrayQuestion(
-        'Ребенок делал рентген в 2 года?',
-        _xrayAt2Yes,
-        _xrayAt2No,
-            (value) {
-          setState(() {
-            _xrayAt2Yes = value;
-            if (value) _xrayAt2No = false;
-          });
-        },
-            (value) {
-          setState(() {
-            _xrayAt2No = value;
-            if (value) _xrayAt2Yes = false;
-          });
-        },
-      ));
-      questions.add(const SizedBox(height: 16));
-    }
-
-    if (_patientAge! >= 6) {
-      questions.add(_buildXrayQuestion(
-        'Ребенок делал рентген в 6 лет?',
-        _xrayAt6Yes,
-        _xrayAt6No,
-            (value) {
-          setState(() {
-            _xrayAt6Yes = value;
-            if (value) _xrayAt6No = false;
-          });
-        },
-            (value) {
-          setState(() {
-            _xrayAt6No = value;
-            if (value) _xrayAt6Yes = false;
-          });
-        },
-      ));
-      questions.add(const SizedBox(height: 16));
-    }
-
-    if (_patientAge! >= 10) {
-      questions.add(_buildXrayQuestion(
-        'Ребенок делал рентген в 10 лет?',
-        _xrayAt10Yes,
-        _xrayAt10No,
-            (value) {
-          setState(() {
-            _xrayAt10Yes = value;
-            if (value) _xrayAt10No = false;
-          });
-        },
-            (value) {
-          setState(() {
-            _xrayAt10No = value;
-            if (value) _xrayAt10Yes = false;
-          });
-        },
-      ));
-    }
-
-    return questions;
-  }
-
-  Widget _buildXrayQuestion(
-      String question,
-      bool yesValue,
-      bool noValue,
-      ValueChanged<bool> onYesChanged,
-      ValueChanged<bool> onNoChanged,
-      ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            question,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildOptionButton(
-                  'Да',
-                  yesValue,
-                      () => onYesChanged(!yesValue),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildOptionButton(
-                  'Нет',
-                  noValue,
-                      () => onNoChanged(!noValue),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOptionButton(String text, bool isSelected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFF6B6B) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFFF6B6B) : Colors.grey.withOpacity(0.5),
-          ),
-        ),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
+  void _navigateToSchedule() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _XraySchedulePage(
+          patientName: widget.patientName,
+          patientAge: _patientAge,
+          gmfcsLevel: _gmfcsLevel,
+          onXrayPhoto: _addXrayImage,
         ),
       ),
     );
   }
 
-  Widget _buildResult() {
-    final schedule = _determineXraySchedule(_patientAge!, 'level ${_gmfcs?.level}');
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.green.shade50,
-            Colors.green.shade100,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.green.withOpacity(0.3),
+  void _navigateToFolder() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _XrayFolderPage(
+          xrayImages: _allXrayImages,
+          onAddXray: _addXrayImage,
+          onDeleteXray: _deleteXrayImage,
+          onViewFile: _viewFile,
+          fetchXrayImages: _fetchAllXrayImagesForPatient,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Рекомендации',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            schedule,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.black87,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _resetSurveyData() {
-    setState(() {
-      _ageController.clear();
-      _patientAge = null;
-      _ageErrorText = null;
-      _resetXrayAnswers();
+    ).then((_) {
+      // Обновляем данные при возврате со страницы папки
+      _loadXrayImages();
     });
   }
 
-  void _resetXrayAnswers() {
-    _xrayAt2Yes = false;
-    _xrayAt2No = false;
-    _xrayAt6Yes = false;
-    _xrayAt6No = false;
-    _xrayAt10Yes = false;
-    _xrayAt10No = false;
-  }
 
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
-  }
 
-  List<XrayImage> get _filteredImages {
-    List<XrayImage> filtered = _xrayImages;
 
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((xray) {
-        return xray.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
-      }).toList();
-    }
 
-    if (_selectedFilter != 'Все') {
-      filtered = filtered.where((xray) {
-        final extension = xray.imagePath.split('.').last.toLowerCase();
-        switch (_selectedFilter) {
-          case 'Изображения':
-            return ['jpg', 'jpeg', 'png', 'gif', 'bmp'].contains(extension);
-          case 'PDF':
-            return extension == 'pdf';
-          case 'Документы':
-            return ['doc', 'docx'].contains(extension);
-          case 'Видео':
-            return ['mp4', 'avi', 'mov'].contains(extension);
-          default:
-            return true;
-        }
-      }).toList();
-    }
-
-    return filtered;
-  }
-
-  Future<void> _addReminderToCalendar() async {
+  Future<void> _scheduleReminder() async {
     final DateTime? selectedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now().add(const Duration(days: 30)),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFFF6B6B),
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
+            colorScheme: const ColorScheme.light(primary: _primaryColor),
           ),
           child: child!,
         );
       },
     );
 
-    if (selectedDate != null) {
-      final TimeOfDay? selectedTime = await showTimePicker(
-        context: context,
-        initialTime: const TimeOfDay(hour: 9, minute: 0),
-        builder: (context, child) {
-          return Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: const ColorScheme.light(
-                primary: Color(0xFFFF6B6B),
-                onPrimary: Colors.white,
-                surface: Colors.white,
-                onSurface: Colors.black,
-              ),
-            ),
-            child: child!,
-          );
-        },
-      ); // Добавлена закрывающая скобка
+    if (selectedDate == null) return;
 
-      if (selectedTime != null) {
-        final DateTime reminderDateTime = DateTime(
-          selectedDate.year,
-          selectedDate.month,
-          selectedDate.day,
-          selectedTime.hour,
-          selectedTime.minute,
-        );
-
-        final Event event = Event(
-          title: 'Рентгенография',
-          description: 'Напоминание о проведении рентгенографии',
-          location: 'Медицинский центр',
-          startDate: reminderDateTime,
-          endDate: reminderDateTime.add(const Duration(hours: 1)),
-          allDay: false,
-        );
-
-        try {
-          final result = await Add2Calendar.addEvent2Cal(event);
-          if (result) {
-            _showSuccessSnackBar('Напоминание добавлено в календарь');
-          } else {
-            _showErrorSnackBar('Не удалось добавить напоминание');
-          }
-        } catch (e) {
-          _showErrorSnackBar('Ошибка добавления напоминания: $e');
-        }
-      }
-    }
-  }
-
-  Future<void> _addXrayFile() async {
-    showModalBottomSheet(
+    final TimeOfDay? selectedTime = await showTimePicker(
       context: context,
-      backgroundColor: const Color(0xFFFFE8E8),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B6B),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Добавить файл',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFFF6B6B),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildFileOptionButton(
-                      icon: Icons.camera_alt,
-                      title: 'Камера',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImageFromCamera();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: _buildFileOptionButton(
-                      icon: Icons.photo_library,
-                      title: 'Галерея',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImageFromGallery();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 15),
-              SizedBox(
-                width: double.infinity,
-                child: _buildFileOptionButton(
-                  icon: Icons.folder,
-                  title: 'Файлы',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickFile();
-                  },
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
+      initialTime: const TimeOfDay(hour: 10, minute: 0),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(primary: _primaryColor),
           ),
+          child: child!,
         );
       },
     );
-  }
 
-  Widget _buildFileOptionButton({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFFF6B6B).withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 30,
-              color: const Color(0xFFFF6B6B),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFFFF6B6B),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    if (selectedTime == null) return;
 
-  Future<void> _pickImageFromCamera() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.camera);
-
-    if (image != null) {
-      _showDescriptionDialog(image.path);
-    }
-  }
-
-  Future<void> _pickImageFromGallery() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-    if (image != null) {
-      _showDescriptionDialog(image.path);
-    }
-  }
-
-  Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
-      allowMultiple: false,
+    final DateTime appointmentDateTime = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+      selectedTime.hour,
+      selectedTime.minute,
     );
 
-    if (result != null && result.files.single.path != null) {
-      _showDescriptionDialog(result.files.single.path!);
-    }
+    await _addToCalendar(appointmentDateTime);
   }
 
-  void _showDescriptionDialog(String filePath) {
-    final TextEditingController descriptionController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFFFFE8E8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: const Text(
-            'Добавить описание',
-            style: TextStyle(
-              color: Color(0xFFFF6B6B),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: TextField(
-            controller: descriptionController,
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Введите описание рентгена...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFFFF6B6B)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFFFF6B6B), width: 2),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Отмена',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _saveXrayFile(filePath, descriptionController.text.trim());
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B6B),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text(
-                'Сохранить',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _saveXrayFile(String filePath, String description) async {
-    setState(() {
-      _isLoading = true;
-    });
-
+  Future<void> _addToCalendar(DateTime appointmentDateTime) async {
     try {
-      await _databaseService.addXrayImage(
-        widget.orthopedicExaminationId,
-        filePath,
-        description: description.isEmpty ? null : description,
+      final Event event = Event(
+        title: 'Рентгенография ТБС',
+        description:
+        'Плановая рентгенография тазобедренных суставов для'
+            'Важно для контроля состояния тазобедренных суставов.',
+        location: 'Медицинский центр',
+        startDate: appointmentDateTime,
+        endDate: appointmentDateTime.add(const Duration(hours: 1)),
+        iosParams: const IOSParams(
+          reminder: Duration(minutes: 15),
+          url: '',
+        ),
+        androidParams: const AndroidParams(
+          emailInvites: [],
+        ),
       );
 
-      _showSuccessSnackBar('Файл успешно добавлен');
-      await _loadXrayImages();
+      final success = await Add2Calendar.addEvent2Cal(event);
+
+      if (success) {
+        _showSuccessSnackBar('Напоминание добавлено в календарь');
+        await _createAdditionalReminders(appointmentDateTime);
+      } else {
+        _showErrorSnackBar('Не удалось добавить событие в календарь');
+      }
     } catch (e) {
-      _showErrorSnackBar('Ошибка сохранения файла: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      _showErrorSnackBar('Ошибка при добавлении в календарь: $e');
     }
   }
 
-  Future<void> _deleteXrayImage(XrayImage xrayImage) async {
-    final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFFFFE8E8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: const Text(
-            'Удалить файл?',
-            style: TextStyle(
-              color: Color(0xFFFF6B6B),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: const Text('Это действие нельзя будет отменить.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text(
-                'Отмена',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B6B),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text(
-                'Удалить',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
+  Future<void> _createAdditionalReminders(DateTime appointmentDateTime) async {
+    final monthBefore = appointmentDateTime.subtract(const Duration(days: 30));
+    if (monthBefore.isAfter(DateTime.now())) {
+      await _addReminderEvent(
+          monthBefore, 'Напоминание: через месяц рентгенография ТБС');
+    }
+
+    final dayBefore = appointmentDateTime.subtract(const Duration(days: 1));
+    if (dayBefore.isAfter(DateTime.now())) {
+      await _addReminderEvent(dayBefore, 'Напоминание: завтра рентгенография ТБС');
+    }
+
+    final hourBefore = appointmentDateTime.subtract(const Duration(hours: 1));
+    if (hourBefore.isAfter(DateTime.now())) {
+      await _addReminderEvent(hourBefore, 'Напоминание: через час рентгенография ТБС');
+    }
+  }
+
+  Future<void> _addReminderEvent(DateTime dateTime, String title) async {
+    final Event event = Event(
+      title: title,
+      description: 'Напоминание о рентгенографии ТБС для ${widget.patientName}',
+      startDate: dateTime,
+      endDate: dateTime.add(const Duration(minutes: 15)),
+    );
+    await Add2Calendar.addEvent2Cal(event);
+  }
+
+  Future<void> _addXrayImage() async {
+    // Создаем новый осмотр для каждого рентгена
+    final examinationId =
+    await _databaseService.createOrthopedicExamination(widget.patientId);
+    await _addXrayToExamination(examinationId);
+    // Обновляем локальный список после добавления
+    await _loadXrayImages();
+  }
+
+  Future<void> _addXrayToExamination(int examinationId) async {
+    final sourceType = await _showImageSourceDialog();
+    if (sourceType == null) return;
+
+    try {
+      String? filePath;
+
+      if (sourceType == 'camera') {
+        final ImagePicker picker = ImagePicker();
+        final XFile? image = await picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
         );
-      },
+        filePath = image?.path;
+      } else if (sourceType == 'gallery') {
+        final ImagePicker picker = ImagePicker();
+        final XFile? image = await picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 85,
+        );
+        filePath = image?.path;
+      } else if (sourceType == 'file') {
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+          allowMultiple: false,
+        );
+        filePath = result?.files.single.path;
+      }
+
+      if (filePath != null) {
+        final fileInfo = await _showFileInfoDialog();
+        if (fileInfo != null) {
+          await _databaseService.addXrayImage(
+            examinationId,
+            filePath,
+            description:
+            '${fileInfo['title']} - ${fileInfo['date']} - ${fileInfo['description']}',
+          );
+          await _loadXrayImages(); // Обновляем данные сразу
+          _showSuccessSnackBar('Рентгенограмма сохранена');
+        }
+      }
+    } catch (e) {
+      _showErrorSnackBar('Ошибка добавления файла: $e');
+    }
+  }
+
+  Future<void> _deleteXrayImage(int xrayId) async {
+    final confirmed = await _showConfirmDialog(
+      'Удалить рентгенограмму?',
+      'Это действие нельзя отменить',
     );
 
-    if (confirm == true && xrayImage.id != null) {
-      setState(() {
-        _isLoading = true;
-      });
-
+    if (confirmed) {
       try {
-        final success = await _databaseService.deleteXrayImage(xrayImage.id!);
-        if (success) {
-          _showSuccessSnackBar('Файл удален');
-          await _loadXrayImages();
-        } else {
-          _showErrorSnackBar('Не удалось удалить файл');
-        }
+        await _databaseService.deleteXrayImage(xrayId);
+        await _loadXrayImages(); // Обновляем данные сразу
+        _showSuccessSnackBar('Рентгенограмма удалена');
       } catch (e) {
         _showErrorSnackBar('Ошибка удаления: $e');
-      } finally {
-        setState(() {
-          _isLoading = false;
-        });
       }
     }
   }
 
-  Future<void> _openFile(String filePath) async {
+  void _viewFile(XrayImage photo) async {
+    final file = File(photo.imagePath);
+
+    if (!file.existsSync()) {
+      _showErrorSnackBar('Файл не найден');
+      return;
+    }
+
     try {
-      final result = await OpenFile.open(filePath);
+      final result = await OpenFile.open(photo.imagePath);
       if (result.type != ResultType.done) {
-        _showErrorSnackBar('Не удалось открыть файл');
+        _showErrorSnackBar('Не удалось открыть файл: ${result.message}');
       }
     } catch (e) {
       _showErrorSnackBar('Ошибка открытия файла: $e');
     }
   }
 
-  Widget _buildFilesList() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          color: const Color(0xFFFFE8E8),
-          child: Column(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Поиск по описанию...',
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: Color(0xFFFF6B6B),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildFilterChip('Все'),
-                    _buildFilterChip('Изображения'),
-                    _buildFilterChip('PDF'),
-                    _buildFilterChip('Документы'),
-                    _buildFilterChip('Видео'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (_xrayImages.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFFF6B6B).withOpacity(0.1),
-                  const Color(0xFFFFE8E8),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFFFF6B6B).withOpacity(0.2),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF6B6B),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.folder_outlined,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Всего файлов: ${_xrayImages.length}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFFF6B6B),
-                        ),
-                      ),
-                      Text(
-                        'Найдено: ${_filteredImages.length}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_searchQuery.isNotEmpty || _selectedFilter != 'Все')
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _selectedFilter = 'Все';
-                      });
-                    },
-                    icon: const Icon(
-                      Icons.clear,
-                      color: Color(0xFFFF6B6B),
-                    ),
-                    tooltip: 'Очистить фильтры',
-                  ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: _filteredImages.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _filteredImages.length,
-            itemBuilder: (context, index) {
-              final xray = _filteredImages[index];
-              return _buildFileCard(xray, index);
-            },
-          ),
-        ),
-      ],
-    );
+  bool _isImageFile(String filePath) {
+    final extension = filePath.toLowerCase().split('.').last;
+    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension);
   }
 
-  Widget _buildFilterChip(String label) {
-    final isSelected = _selectedFilter == label;
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (selected) {
-          setState(() {
-            _selectedFilter = selected ? label : 'Все';
-          });
-        },
-        backgroundColor: Colors.white,
-        selectedColor: const Color(0xFFFF6B6B).withOpacity(0.2),
-        checkmarkColor: const Color(0xFFFF6B6B),
-        labelStyle: TextStyle(
-          color: isSelected ? const Color(0xFFFF6B6B) : Colors.grey[700],
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+  Future<String?> _showImageSourceDialog() async {
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _lightColor,
+        title: const Text(
+          'Выберите источник',
+          style: TextStyle(color: _primaryColor, fontWeight: FontWeight.bold),
         ),
-        side: BorderSide(
-          color: isSelected ? const Color(0xFFFF6B6B) : Colors.grey.withOpacity(0.3),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildSourceOption(Icons.camera_alt, 'Камера', 'camera'),
+            _buildSourceOption(Icons.photo_library, 'Галерея', 'gallery'),
+            _buildSourceOption(Icons.insert_drive_file, 'Файл', 'file'),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    if (_xrayImages.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildSourceOption(IconData icon, String title, String value) {
+    return ListTile(
+      leading: Icon(icon, color: _primaryColor),
+      title: Text(title, style: const TextStyle(color: _primaryColor)),
+      onTap: () => Navigator.pop(context, value),
+    );
+  }
+
+  Future<Map<String, String>?> _showFileInfoDialog() async {
+    final TextEditingController titleController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+    final TextEditingController dateController = TextEditingController(
+      text: _formatDate(DateTime.now()),
+    );
+
+    return await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _lightColor,
+        title: const Text(
+          'Информация о рентгенограмме',
+          style: TextStyle(color: _primaryColor, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFE8E8),
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: Icon(
-                Icons.folder_open,
-                size: 50,
-                color: const Color(0xFFFF6B6B).withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Картотека пуста',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Добавьте первый файл рентгена',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _addXrayFile,
-              icon: const Icon(Icons.add),
-              label: const Text('Добавить файл'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B6B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(
+                labelText: 'Название',
+                hintText: 'Например: Рентген ТБС',
+                border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: _primaryColor),
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: dateController,
+              decoration: const InputDecoration(
+                labelText: 'Дата',
+                border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: _primaryColor),
+                ),
+              ),
+              readOnly: true,
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (date != null) {
+                  dateController.text = _formatDate(date);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Описание',
+                hintText: 'Дополнительная информация',
+                border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: _primaryColor),
+                ),
+              ),
+              maxLines: 2,
+            ),
           ],
         ),
-      );
-    } else {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off,
-              size: 64,
-              color: Colors.grey[400],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (titleController.text.trim().isNotEmpty) {
+                Navigator.pop(context, {
+                  'title': titleController.text.trim(),
+                  'date': dateController.text,
+                  'description': descriptionController.text.trim(),
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Ничего не найдено',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Попробуйте изменить параметры поиска',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  Widget _buildFileCard(XrayImage xray, int index) {
-    final fileExtension = xray.imagePath.split('.').last.toLowerCase();
-
-    IconData fileIcon = Icons.insert_drive_file;
-    Color iconColor = const Color(0xFFFF6B6B);
-    String fileType = 'Файл';
-    Color cardColor = Colors.white;
-
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].contains(fileExtension)) {
-      fileIcon = Icons.image;
-      fileType = 'Изображение';
-      cardColor = Colors.blue.shade50;
-      iconColor = Colors.blue;
-    } else if (['pdf'].contains(fileExtension)) {
-      fileIcon = Icons.picture_as_pdf;
-      fileType = 'PDF документ';
-      cardColor = Colors.red.shade50;
-      iconColor = Colors.red;
-    } else if (['doc', 'docx'].contains(fileExtension)) {
-      fileIcon = Icons.description;
-      fileType = 'Документ Word';
-      cardColor = Colors.indigo.shade50;
-      iconColor = Colors.indigo;
-    } else if (['mp4', 'avi', 'mov'].contains(fileExtension)) {
-      fileIcon = Icons.videocam;
-      fileType = 'Видеофайл';
-      cardColor = Colors.purple.shade50;
-      iconColor = Colors.purple;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            child: const Text('Сохранить'),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _openFile(xray.imagePath),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: iconColor.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Icon(
-                    fileIcon,
-                    color: iconColor,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: iconColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              fileType,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: iconColor,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '#${index + 1}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (xray.description != null && xray.description!.isNotEmpty)
-                        Text(
-                          xray.description!,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      else
-                        Text(
-                          'Без описания',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 14,
-                            color: Colors.grey[500],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${xray.createdAt.day.toString().padLeft(2, '0')}.${xray.createdAt.month.toString().padLeft(2, '0')}.${xray.createdAt.year} в ${xray.createdAt.hour.toString().padLeft(2, '0')}:${xray.createdAt.minute.toString().padLeft(2, '0')}',
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF6B6B).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        onPressed: () => _openFile(xray.imagePath),
-                        icon: const Icon(
-                          Icons.open_in_new,
-                          color: Color(0xFFFF6B6B),
-                          size: 20,
-                        ),
-                        tooltip: 'Открыть файл',
-                        constraints: const BoxConstraints(
-                          minHeight: 36,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        onPressed: () => _deleteXrayImage(xray),
-                        icon: Icon(
-                          Icons.delete_outline,
-                          color: Colors.red[400],
-                          size: 20,
-                        ),
-                        tooltip: 'Удалить файл',
-                        constraints: const BoxConstraints(
-                          minWidth: 36,
-                          minHeight: 36,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+    );
+  }
+
+  Future<bool> _showConfirmDialog(String title, String content) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _lightColor,
+        title: Text(title, style: const TextStyle(color: _primaryColor)),
+        content: Text(content, style: const TextStyle(color: _primaryColor)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
           ),
-        ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Удалить'),
+          ),
+        ],
       ),
     );
+    return result ?? false;
   }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            const Icon(
-              Icons.check_circle,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
+        content: Text(message),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -1766,124 +535,1135 @@ class _RentgenPageState extends State<RentgenPage> with SingleTickerProviderStat
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            const Icon(
-              Icons.error,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
+        content: Text(message),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFF6B6B),
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-          ),
-        ),
+        backgroundColor: _primaryColor,
+        foregroundColor: Colors.white,
         title: const Text(
-          'Рентгенография',
+          'Рентгенография ТБС',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
-            onPressed: _addReminderToCalendar,
             icon: const Icon(
-              Icons.calendar_today,
+              Icons.help_outline,
               color: Colors.white,
+              size: 24,
             ),
-            tooltip: 'Добавить напоминание',
+            onPressed: () {
+              // Заглушка - пока просто показываем снэкбар
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Справка по рентгенографии'),
+                  backgroundColor: _primaryColor,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
           ),
-          if (_currentTabIndex == 1)
-            IconButton(
-              onPressed: _addXrayFile,
-              icon: const Icon(
-                Icons.add,
-                color: Colors.white,
-              ),
-              tooltip: 'Добавить файл',
-            ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          tabs: const [
-            Tab(
-              icon: Icon(Icons.analytics),
-              text: 'График',
+
+      ),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInfoCard(),
+              const SizedBox(height: 30),
+              _buildActionCards(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _lightColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _primaryColor.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: _primaryColor,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Важная информация',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _primaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'В связи с высоким риском развития патологии ТБС у детей с ДЦП, необходимо проведение рентгенографии ТБС согласно графику.',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: Colors.black87,
             ),
-            Tab(
-              icon: Icon(Icons.folder),
-              text: 'Картотека',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCards() {
+    return Column(
+      children: [
+        // Первая строка - график рентгенографии
+        GestureDetector(
+          onTap: _navigateToSchedule,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: _primaryColor,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: _primaryColor.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.calendar_view_week,
+                  color: Colors.white,
+                  size: 48,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'График рентгенографии ТБС',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Просмотр графика и добавление рентгенограмм',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Вторая строка - укладка пациента
+        GestureDetector(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF974D),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.shade600.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.medical_services,
+                  color: Colors.white,
+                  size: 36,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Укладка ребенка при рентгенографии ТБС',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Инструкция по правильной укладке',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Третья строка - папка и напоминание
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: _navigateToFolder,
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: _yellowColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _yellowColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.folder,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Папка рентгенограмм ТБС',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_allXrayImages.length} записей',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            Expanded(
+              child: GestureDetector(
+                onTap: _scheduleReminder,
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: _whiteColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _primaryColor, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.thumb_up,
+                        color: _primaryColor,
+                        size: 36,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Напоминание',
+                        style: TextStyle(
+                          color: _primaryColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Настроить\nуведомления',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
+      ],
+    );
+  }
+}
+
+// Страница графика рентгенографии
+class _XraySchedulePage extends StatelessWidget {
+  final String patientName;
+  final int? patientAge;
+  final int? gmfcsLevel;
+  final Future<void> Function() onXrayPhoto;
+
+  const _XraySchedulePage({
+    required this.patientName,
+    required this.patientAge,
+    required this.gmfcsLevel,
+    required this.onXrayPhoto,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFF974D),
+        foregroundColor: Colors.white,
+        title: const Text('График рентгенографии'),
+        elevation: 0,
       ),
-      body: _isLoading
-          ? Container(
-        color: const Color(0xFFF8F9FA),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildPatientInfoCard(),
+            const SizedBox(height: 20),
+            _buildScheduleTable(),
+            const SizedBox(height: 20),
+            _buildRecommendationCard(),
+            const SizedBox(height: 30),
+            _buildXrayCard(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPatientInfoCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1E6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFF974D), width: 1),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Данные пациента',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFFFF974D),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B6B)),
+              Column(
+                children: [
+                  const Icon(
+                    Icons.cake,
+                    color: Color(0xFFFF974D),
+                    size: 24,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Возраст',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  Text(
+                    patientAge != null ? '$patientAge лет' : 'Не указан',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFF974D),
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: 16),
-              Text(
-                'Загрузка данных...',
+              Container(
+                width: 1,
+                height: 60,
+                color: Colors.grey.shade300,
+              ),
+              Column(
+                children: [
+                  const Icon(
+                    Icons.accessibility,
+                    color: Color(0xFFFF974D),
+                    size: 24,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'GMFCS',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  Text(
+                    gmfcsLevel != null ? 'Уровень $gmfcsLevel' : 'Не указан',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFF974D),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScheduleTable() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFF974D),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: const Center(
+              child: Text(
+                'График рентгенографии ТБС',
                 style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          Table(
+            border: TableBorder.all(color: Colors.grey.shade300),
+            columnWidths: const {
+              0: FixedColumnWidth(80),
+              1: FlexColumnWidth(),
+              2: FlexColumnWidth(),
+              3: FlexColumnWidth(),
+              4: FlexColumnWidth(),
+              5: FlexColumnWidth(),
+            },
+            children: [
+              _buildTableHeaderRow(),
+              _buildTableDataRow('2', [false, true, true, true, true]),
+              _buildTableDataRow('2,5', [false, false, false, true, true]),
+              _buildTableDataRow('3', [false, false, true, true, true]),
+              _buildTableDataRow('3,5', [false, false, false, true, true]),
+              _buildTableDataRow('4', [false, false, true, true, true]),
+              _buildTableDataRow('5', [false, true, true, true, true]),
+              _buildTableDataRow('6', [false, true, true, true, true]),
+              _buildTableDataRow('7', [false, false, true, true, true]),
+              _buildTableDataRow('8', [false, false, true, true, true]),
+              _buildTableDataRow('9', [false, true, true, true, true]),
+              _buildTableDataRow('10', [false, true, true, true, true]),
+              _buildTableDataRow('11', [false, false, true, true, true]),
+              _buildTableDataRow('12-16', [false, false, true, true, true], hasSpecialText: true),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  TableRow _buildTableHeaderRow() {
+    return TableRow(
+      decoration: const BoxDecoration(color: Color(0xFFFF974D)),
+      children: [
+        _buildHeaderCell('Возраст'),
+        _buildHeaderCell('GMFCS I'),
+        _buildHeaderCell('GMFCS II'),
+        _buildHeaderCell('GMFCS III'),
+        _buildHeaderCell('GMFCS IV'),
+        _buildHeaderCell('GMFCS V'),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCell(String text) {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.all(12),
+      child: Center(
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 12,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  TableRow _buildTableDataRow(String age, List<bool> visits, {bool hasSpecialText = false}) {
+    final isCurrentAge = patientAge != null && _isAgeMatch(age, patientAge!);
+
+    return TableRow(
+      decoration: BoxDecoration(
+        color: isCurrentAge ? const Color(0xFFFFF1E6) : Colors.white,
+      ),
+      children: [
+        Container(
+          height: 60,
+          padding: const EdgeInsets.all(12),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFF974D),
+          ),
+          child: Center(
+            child: Text(
+              age,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        ...visits.asMap().entries.map((entry) {
+          final index = entry.key;
+          final shouldVisit = entry.value;
+          final isPatientColumn = gmfcsLevel != null && (index + 1) == gmfcsLevel;
+
+          return Container(
+            height: 60,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: shouldVisit
+                  ? (isPatientColumn && isCurrentAge ? const Color(0xFFFF974D) : const Color(
+                  0xFFF38F4B))
+                  : (isPatientColumn && isCurrentAge ? const Color(0xFFFFF1E6) : Colors.white),
+              border: isPatientColumn
+                  ? Border.all(color: const Color(0xFFFF974D), width: 2)
+                  : null,
+            ),
+            child: Center(
+              child: hasSpecialText && shouldVisit && (index >= 2) // GMFCS III, IV, V для 12-16 лет
+                  ? const Text(
+                'x2 год',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              )
+                  : (shouldVisit ? const Icon(Icons.check, color: Colors.white, size: 24) : const SizedBox()),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  bool _isAgeMatch(String ageRange, int patientAge) {
+    if (ageRange.contains('-')) {
+      // Для диапазона типа "12-16"
+      final parts = ageRange.split('-');
+      final minAge = int.tryParse(parts[0]) ?? 0;
+      final maxAge = int.tryParse(parts[1]) ?? 0;
+      return patientAge >= minAge && patientAge <= maxAge;
+    } else if (ageRange.contains(',')) {
+      // Для возраста типа "2,5"
+      final age = double.tryParse(ageRange.replaceAll(',', '.')) ?? 0;
+      return patientAge == age.floor();
+    } else {
+      // Для целого возраста
+      final age = int.tryParse(ageRange) ?? 0;
+      return patientAge == age;
+    }
+  }
+
+  Widget _buildRecommendationCard() {
+    final recommendation = _getRecommendation();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFAE0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFD500), width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.lightbulb_outline,
+                color: Color(0xFFFFD500),
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Рекомендация',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFFFD500),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            recommendation,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.black87,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getRecommendation() {
+    if (patientAge == null || gmfcsLevel == null) {
+      return 'Для получения персональной рекомендации необходимо указать возраст ребенка и уровень GMFCS в профиле пациента.';
+    }
+
+    // Определяем нужность рентгенографии на основе таблицы
+    bool needsXray = false;
+    bool needsTwiceAYear = false;
+
+    // Логика определения необходимости рентгенографии на основе возраста и GMFCS
+    if (patientAge == 2 && gmfcsLevel! >= 2) {
+      needsXray = true;
+    } else if (patientAge == 3 && gmfcsLevel! >= 3) {
+      needsXray = true;
+    } else if (patientAge == 4 && gmfcsLevel! >= 3) {
+      needsXray = true;
+    } else if (patientAge == 5 && (gmfcsLevel == 2 || gmfcsLevel! >= 3)) {
+      needsXray = true;
+    } else if (patientAge == 6 && (gmfcsLevel == 2 || gmfcsLevel! >= 3)) {
+      needsXray = true;
+    } else if (patientAge == 7 && gmfcsLevel! >= 3) {
+      needsXray = true;
+    } else if (patientAge == 8 && gmfcsLevel! >= 3) {
+      needsXray = true;
+    } else if (patientAge == 9 && (gmfcsLevel == 2 || gmfcsLevel! >= 3)) {
+      needsXray = true;
+    } else if (patientAge == 10 && (gmfcsLevel == 2 || gmfcsLevel! >= 3)) {
+      needsXray = true;
+    } else if (patientAge == 11 && gmfcsLevel! >= 3) {
+      needsXray = true;
+    } else if (patientAge! >= 12 && patientAge! <= 16 && gmfcsLevel! >= 3) {
+      needsXray = true;
+      needsTwiceAYear = true;
+    }
+
+    if (!needsXray) {
+      return 'На данный момент плановая рентгенография ТБС не требуется согласно графику для возраста $patientAge лет и уровня GMFCS $gmfcsLevel.';
+    }
+
+    if (needsTwiceAYear) {
+      return 'Рекомендуется проводить рентгенографию ТБС ДВАЖДЫ В ГОД. Возраст ребенка: $patientAge лет, уровень GMFCS: $gmfcsLevel. В подростковом возрасте особенно важен регулярный контроль состояния тазобедренных суставов.';
+    }
+
+    return 'Рекомендуется проводить рентгенографию ТБС НЕ МЕНЕЕ ОДНОГО РАЗА В ГОД. Возраст ребенка: $patientAge лет, уровень GMFCS: $gmfcsLevel. Регулярное рентгенологическое обследование помогает своевременно выявить патологию тазобедренных суставов.';
+  }
+
+  Widget _buildXrayCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1E6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFF974D), width: 2),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Рентгенограмма ТБС',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFFFF974D),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Сфотографируйте или загрузите рентгенограмму тазобедренных суставов',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () async {
+              // Ждём пока родитель выполнит весь процесс добавления (диалоги, сохранение)
+              await onXrayPhoto();
+              // Остаёмся на странице графика
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Рентгенограмма добавлена'), backgroundColor: Colors.green),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF974D),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF974D).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.add_a_photo,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: const Text(
+                      'Добавить рентгенограмму',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Страница папки рентгенограмм
+class _XrayFolderPage extends StatefulWidget {
+  final List<XrayImage> xrayImages;
+  final Future<void> Function() onAddXray;
+  final Future<void> Function(int) onDeleteXray;
+  final Function(XrayImage) onViewFile;
+  final Future<List<XrayImage>> Function() fetchXrayImages;
+
+  const _XrayFolderPage({
+    required this.xrayImages,
+    required this.onAddXray,
+    required this.onDeleteXray,
+    required this.onViewFile,
+    required this.fetchXrayImages,
+  });
+
+  @override
+  State<_XrayFolderPage> createState() => _XrayFolderPageState();
+}
+
+class _XrayFolderPageState extends State<_XrayFolderPage> {
+  static const Color _primaryColor = Color(0xFFFF974D);
+  static const Color _lightColor = Color(0xFFFFF1E6);
+  static const Color _yellowColor = Color(0xFFFFC107);
+
+  late List<XrayImage> _localXrayImages;
+
+  @override
+  void initState() {
+    super.initState();
+    _localXrayImages = widget.xrayImages;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: _primaryColor,
+        foregroundColor: Colors.white,
+        title: const Text('Папка рентгенограмм ТБС'),
+        elevation: 0,
+      ),
+      body: _localXrayImages.isEmpty
+          ? _buildEmptyState()
+          : ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _localXrayImages.length,
+        itemBuilder: (context, index) {
+          final xray = _localXrayImages[index];
+          return _buildXrayCard(xray, index);
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await widget.onAddXray();
+          _localXrayImages = await widget.fetchXrayImages();
+          setState(() {});
+        },
+        backgroundColor: _primaryColor,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.folder_open,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Нет рентгенограмм',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Добавьте первую рентгенограмму ТБС',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await widget.onAddXray();
+              _localXrayImages = await widget.fetchXrayImages();
+              setState(() {});
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Добавить рентгенограмму'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildXrayCard(XrayImage xray, int index) {
+    final isImage = _isImageFile(xray.imagePath);
+    final fileName = xray.imagePath.split('/').last;
+    final fileExtension = fileName.split('.').last.toUpperCase();
+
+    String displayTitle = 'Рентгенограмма ${index + 1}';
+    String displayDate = _formatDate(xray.createdAt);
+    String displayDescription = '';
+
+    if (xray.description != null && xray.description!.contains(' - ')) {
+      final parts = xray.description!.split(' - ');
+      if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        displayTitle = parts[0];
+      }
+      if (parts.length > 1 && parts[1].isNotEmpty) {
+        displayDate = parts[1];
+      }
+      if (parts.length > 2 && parts[2].isNotEmpty) {
+        displayDescription = parts[2];
+      }
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => widget.onViewFile(xray),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: isImage ? _lightColor : _yellowColor.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: isImage
+                    ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    File(xray.imagePath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.broken_image,
+                      color: Colors.grey.shade400,
+                      size: 30,
+                    ),
+                  ),
+                )
+                    : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _getFileIcon(fileExtension),
+                        color: _primaryColor,
+                        size: 24,
+                      ),
+                      Text(
+                        fileExtension,
+                        style: const TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: _primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayTitle,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      displayDate,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (displayDescription.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        displayDescription,
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          isImage ? Icons.image : Icons.insert_drive_file,
+                          size: 16,
+                          color: Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isImage ? 'Рентгенограмма' : 'Документ',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == 'view') {
+                    widget.onViewFile(xray);
+                  } else if (value == 'delete') {
+                    await widget.onDeleteXray(xray.id!);
+                    _localXrayImages = await widget.fetchXrayImages();
+                    setState(() {});
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'view',
+                    child: Row(
+                      children: [
+                        Icon(Icons.visibility, size: 18),
+                        SizedBox(width: 8),
+                        Text('Просмотр'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Удалить', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.more_vert,
+                    color: Colors.grey.shade600,
+                    size: 20,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-      )
-          : TabBarView(
-        controller: _tabController,
-        children: [
-          _buildXrayChart(),
-          _buildFilesList(),
-        ],
       ),
-      floatingActionButton: _currentTabIndex == 1
-          ? FloatingActionButton.extended(
-        onPressed: _addXrayFile,
-        backgroundColor: const Color(0xFFFF6B6B),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Добавить файл',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-      )
-          : null,
     );
+  }
+
+  IconData _getFileIcon(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return Icons.image;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+
+  bool _isImageFile(String filePath) {
+    final extension = filePath.toLowerCase().split('.').last;
+    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension);
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 }
