@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:add_2_calendar/add_2_calendar.dart';
 
 import '../../../services/database_service.dart';
 
@@ -18,9 +19,16 @@ class _SalivationPageState extends State<SalivationPage> {
   bool _testCompleted = false;
   int _totalScore = 0;
   String _recommendation = "";
+  List<dynamic> _allSalivationRecords = [];
+  DateTime? _nextTestDate;
 
   // Хранение ответов на вопросы (0-10 баллов)
   List<int> _answers = List.filled(10, -1); // -1 означает не выбрано
+
+  // Цвета
+  final Color _blueColor = const Color(0xFF74B9FF);
+  final Color _darkBlueColor = const Color(0xFF0984E3);
+  final Color _yellowColor = const Color(0xFFF39C12);
 
   // Вопросы теста
   final List<Map<String, String>> _questions = [
@@ -86,15 +94,19 @@ class _SalivationPageState extends State<SalivationPage> {
     setState(() => _isLoading = true);
     try {
       final latestSalivation = await _databaseService.getLatestSalivation(patientId);
-      if (latestSalivation != null) {
-        setState(() {
+      final allRecords = await _databaseService.getSalivations(patientId);
+
+      setState(() {
+        _allSalivationRecords = allRecords;
+        if (latestSalivation != null) {
           _testCompleted = true;
           _totalScore = latestSalivation.complicationScore;
           _recommendation = _totalScore >= 10
               ? "Рекомендуется направление на ботулинотерапию"
               : "Слюнотечение в пределах нормы, дополнительного лечения не требуется";
-        });
-      }
+          _nextTestDate = latestSalivation.createdAt.add(const Duration(days: 90));
+        }
+      });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка загрузки данных: $e')),
@@ -118,13 +130,24 @@ class _SalivationPageState extends State<SalivationPage> {
         notes: _recommendation,
       );
 
+      // Устанавливаем дату следующего теста (через 3 месяца)
+      final now = DateTime.now();
+      _nextTestDate = DateTime(now.year, now.month + 3, now.day);
+
+      // Добавляем напоминание в календарь
+      await _addCalendarReminder();
+
+      // Обновляем список записей
+      final updatedRecords = await _databaseService.getSalivations(patientId);
+
       setState(() {
         _testCompleted = true;
         _showQuestionnaire = false;
+        _allSalivationRecords = updatedRecords;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Результаты сохранены!')),
+        const SnackBar(content: Text('Результаты сохранены! Напоминание добавлено в календарь через 3 месяца.')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -135,9 +158,40 @@ class _SalivationPageState extends State<SalivationPage> {
     }
   }
 
+  Future<void> _addCalendarReminder() async {
+    try {
+      if (_nextTestDate != null) {
+        final Event event = Event(
+          title: 'Тест на слюнотечение',
+          description: 'Время пройти повторный тест на слюнотечение',
+          location: 'Дом',
+          startDate: _nextTestDate!,
+          endDate: _nextTestDate!.add(const Duration(hours: 1)),
+          iosParams: const IOSParams(
+            reminder: Duration(hours: 1),
+          ),
+          androidParams: const AndroidParams(
+            emailInvites: [],
+          ),
+        );
+
+        await Add2Calendar.addEvent2Cal(event);
+        print('Напоминание добавлено в календарь на дату: $_nextTestDate');
+      }
+    } catch (e) {
+      print('Ошибка добавления в календарь: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось добавить напоминание в календарь'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
   void _startNewTest() {
     setState(() {
-      _answers = List.filled(10, -1); // -1 означает не выбрано
+      _answers = List.filled(10, -1);
       _showQuestionnaire = true;
       _testCompleted = false;
       _totalScore = 0;
@@ -145,34 +199,62 @@ class _SalivationPageState extends State<SalivationPage> {
     });
   }
 
+  void _navigateToFolder() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SalivationFolderPage(records: _allSalivationRecords),
+      ),
+    );
+  }
+
   bool get _allQuestionsAnswered {
-    return _answers.every((answer) => answer >= 0); // теперь 0 - валидный ответ
+    return _answers.every((answer) => answer >= 0);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Оценка слюнотечения',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+    return WillPopScope(
+      onWillPop: () async {
+        if (_showQuestionnaire) {
+          setState(() {
+            _showQuestionnaire = false;
+          });
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          title: const Text(
+            'Слюнотечение',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          backgroundColor: _blueColor,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () {
+              if (_showQuestionnaire) {
+                setState(() {
+                  _showQuestionnaire = false;
+                });
+              } else {
+                Navigator.of(context).pop();
+              }
+            },
           ),
         ),
-        backgroundColor: const Color(0xFF74B9FF),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _showQuestionnaire
+            ? _buildQuestionnaire()
+            : _buildMainScreen(),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _showQuestionnaire
-          ? _buildQuestionnaire()
-          : _buildMainScreen(),
     );
   }
 
@@ -181,11 +263,9 @@ class _SalivationPageState extends State<SalivationPage> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          // Карточка справки
           _buildInfoCard(),
           const SizedBox(height: 16),
-          // Карточка анкеты/результатов
-          _buildQuestionnaireCard(),
+          _buildActionCards(),
         ],
       ),
     );
@@ -205,8 +285,8 @@ class _SalivationPageState extends State<SalivationPage> {
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(
               colors: [
-                const Color(0xFF74B9FF).withOpacity(0.1),
-                const Color(0xFF0984E3).withOpacity(0.05),
+                _blueColor.withOpacity(0.1),
+                _darkBlueColor.withOpacity(0.05),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -220,7 +300,7 @@ class _SalivationPageState extends State<SalivationPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF74B9FF),
+                      color: _blueColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -232,7 +312,7 @@ class _SalivationPageState extends State<SalivationPage> {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'Справка о слюнотечении',
+                      'Слюнотечение – это',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -242,14 +322,14 @@ class _SalivationPageState extends State<SalivationPage> {
                   ),
                   Icon(
                     Icons.arrow_forward_ios,
-                    color: const Color(0xFF74B9FF),
+                    color: _blueColor,
                     size: 16,
                   ),
                 ],
               ),
               const SizedBox(height: 16),
               const Text(
-                'Слюнотечение (сиалорея) — избыточное выделение слюны, которое может значительно влиять на качество жизни ребенка и семьи.',
+                'Слюнотечение или сиалорея, также известная как гиперсаливация или птиализм, это состояние, характеризующееся избыточным слюноотделением...',
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.5,
@@ -260,10 +340,10 @@ class _SalivationPageState extends State<SalivationPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF74B9FF).withOpacity(0.1),
+                  color: _blueColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: const Color(0xFF74B9FF).withOpacity(0.3),
+                    color: _blueColor.withOpacity(0.3),
                   ),
                 ),
                 child: Row(
@@ -280,7 +360,7 @@ class _SalivationPageState extends State<SalivationPage> {
                     ),
                     Icon(
                       Icons.touch_app,
-                      color: const Color(0xFF74B9FF),
+                      color: _blueColor,
                       size: 16,
                     ),
                   ],
@@ -293,89 +373,155 @@ class _SalivationPageState extends State<SalivationPage> {
     );
   }
 
-  Widget _buildQuestionnaireCard() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildActionCards() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 16) / 2;
+        final cardHeight = cardWidth * 1.1;
+
+        return Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _testCompleted
-                        ? Colors.green
-                        : const Color(0xFF0984E3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _testCompleted ? Icons.assignment_turned_in : Icons.assignment,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _testCompleted ? 'Результаты теста' : 'Тест на слюнотечение',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0984E3),
+            Expanded(
+              child: SizedBox(
+                height: cardHeight,
+                child: GestureDetector(
+                  onTap: _startNewTest,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _blueColor,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _blueColor.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.assignment,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Анкета',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _testCompleted ? 'Пройдено' : 'Пройти тест',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                          ),
+                        ),
+                        if (_nextTestDate != null) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'Следующий:',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 9,
+                                  ),
+                                ),
+                                Text(
+                                  '${_getDaysUntilNextTest()} дн.',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 16),
-            if (_testCompleted) ...[
-              _buildResults(),
-            ] else ...[
-              const Text(
-                'Пройдите тест из 10 вопросов для оценки степени слюнотечения у вашего ребенка.',
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: Colors.black87,
+            const SizedBox(width: 16),
+            Expanded(
+              child: SizedBox(
+                height: cardHeight,
+                child: GestureDetector(
+                  onTap: _navigateToFolder,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _yellowColor,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _yellowColor.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.folder,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Папка\nслюнотечения',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_allSalivationRecords.length} записей',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _startNewTest,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF74B9FF),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
-                  child: const Text(
-                    'Начать тест',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ],
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  int _getDaysUntilNextTest() {
+    if (_nextTestDate == null) return 0;
+    final now = DateTime.now();
+    final difference = _nextTestDate!.difference(now).inDays;
+    return difference > 0 ? difference : 0;
   }
 
   void _showInfoDetails() {
@@ -384,7 +530,7 @@ class _SalivationPageState extends State<SalivationPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
+        height: MediaQuery.of(context).size.height * 0.9,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -395,10 +541,7 @@ class _SalivationPageState extends State<SalivationPage> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF74B9FF),
-                    const Color(0xFF0984E3),
-                  ],
+                  colors: [_blueColor, _darkBlueColor],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -446,28 +589,23 @@ class _SalivationPageState extends State<SalivationPage> {
                   children: [
                     _buildInfoSection(
                       'Что такое слюнотечение?',
-                      'Слюнотечение (сиалорея) — это состояние, при котором происходит избыточное выделение слюны или нарушение её проглатывания. Это может быть как нормальным явлением в определённом возрасте, так и признаком различных неврологических или анатомических нарушений.',
+                      'Слюнотечение или сиалорея, также известная как гиперсаливация или птиализм, это состояние, характеризующееся избыточным слюноотделением, когда количество слюны, выделяемой слюнными железами, превышает норму. Это состояние может быть вызвано различными факторами, включая заболевания нервной системы, слюнных желез, а также другие медицинские состояния.',
                       Icons.help_outline,
                     ),
                     _buildInfoSection(
-                      'Причины слюнотечения',
-                      '• Неврологические нарушения (ДЦП, аутизм)\n• Анатомические особенности\n• Прорезывание зубов\n• Побочные эффекты лекарств\n• Инфекции полости рта\n• Гастроэзофагеальный рефлюкс',
+                      'Симптомы сиалореи',
+                      'Основной симптом сиалореи - избыточное слюноотделение, которое может проявляться как постоянное подтекание слюны изо рта, так и ощущением избыточной слюны во рту. Это может приводить к следующим проблемам:\n\n• Неприятный запах изо рта (галитоз)\n• Затруднения при приеме пищи и глотании\n• Нарушения речи\n• Раздражение и мацерация кожи вокруг рта\n• Увеличение риска инфекций ротовой полости и кожи\n• Социальная изоляция и снижение самооценки',
                       Icons.medical_services_outlined,
                     ),
                     _buildInfoSection(
-                      'Влияние на качество жизни',
-                      'Избыточное слюнотечение может существенно влиять на:\n• Социальную активность ребёнка\n• Речевое развитие\n• Состояние кожи вокруг рта\n• Повседневную жизнь семьи\n• Самооценку ребёнка',
-                      Icons.sentiment_dissatisfied_outlined,
+                      'Типы сиалореи',
+                      'Передняя сиалорея характеризуется вытеканием слюны изо рта, часто называемым слюнотечением.\n\nЗадняя сиалорея, напротив, означает стекание слюны по задней стенке глотки, что может приводить к поперхиванию и аспирации (попаданию слюны в дыхательные пути).',
+                      Icons.category_outlined,
                     ),
                     _buildInfoSection(
-                      'Методы лечения',
-                      '• Логопедические упражнения\n• Медикаментозная терапия\n• Ботулинотерапия (инъекции ботокса)\n• Хирургические методы\n• Физиотерапия\n• Поведенческая терапия',
-                      Icons.healing_outlined,
-                    ),
-                    _buildInfoSection(
-                      'О шкале оценки',
-                      'Данная шкала позволяет объективно оценить степень выраженности слюнотечения и его влияние на повседневную жизнь. Результат в 10 и более баллов указывает на необходимость специализированного лечения, включая возможность ботулинотерапии.',
-                      Icons.assessment_outlined,
+                      'Основные риски',
+                      'Основные риски включают:\n\n• Обезвоживание и нарушение электролитного баланса из-за потери жидкости\n• Развитие кожных проблем, таких как периоральный дерматит\n• Наиболее опасным осложнением является аспирационная пневмония, возникающая из-за попадания слюны в дыхательные пути, особенно у людей с нарушениями глотания\n• Сиалорея может негативно влиять на социальную адаптацию и качество жизни',
+                      Icons.warning_outlined,
                     ),
                   ],
                 ),
@@ -496,12 +634,12 @@ class _SalivationPageState extends State<SalivationPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF74B9FF).withOpacity(0.1),
+                  color: _blueColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
-                  color: const Color(0xFF74B9FF),
+                  color: _blueColor,
                   size: 20,
                 ),
               ),
@@ -509,10 +647,10 @@ class _SalivationPageState extends State<SalivationPage> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0984E3),
+                    color: _darkBlueColor,
                   ),
                 ),
               ),
@@ -532,78 +670,52 @@ class _SalivationPageState extends State<SalivationPage> {
     );
   }
 
-  Widget _buildResults() {
-    final bool needsTreatment = _totalScore >= 10;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: needsTreatment
-                ? Colors.orange.withOpacity(0.1)
-                : Colors.green.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: needsTreatment
-                  ? Colors.orange.withOpacity(0.3)
-                  : Colors.green.withOpacity(0.3),
-            ),
-          ),
-          child: Column(
-            children: [
-              Text(
-                'Общий балл: $_totalScore',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: needsTreatment ? Colors.orange[700] : Colors.green[700],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _recommendation,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: needsTreatment ? Colors.orange[800] : Colors.green[800],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _startNewTest,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0984E3),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 2,
-            ),
-            child: const Text(
-              'Пройти тест заново',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildQuestionnaire() {
     return Column(
       children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _blueColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 1,
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                const Text(
+                  'Пройдите анкету',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: _answers.where((a) => a >= 0).length / _questions.length,
+                  backgroundColor: Colors.white.withOpacity(0.3),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_answers.where((a) => a >= 0).length} из ${_questions.length} вопросов',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -633,7 +745,7 @@ class _SalivationPageState extends State<SalivationPage> {
                 onPressed: _allQuestionsAnswered ? _saveResults : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _allQuestionsAnswered
-                      ? const Color(0xFF74B9FF)
+                      ? _blueColor
                       : Colors.grey[300],
                   foregroundColor: _allQuestionsAnswered
                       ? Colors.white
@@ -676,7 +788,7 @@ class _SalivationPageState extends State<SalivationPage> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF74B9FF),
+                color: _blueColor,
                 letterSpacing: 0.5,
               ),
             ),
@@ -719,11 +831,11 @@ class _SalivationPageState extends State<SalivationPage> {
             const SizedBox(height: 8),
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                activeTrackColor: const Color(0xFF74B9FF),
+                activeTrackColor: _blueColor,
                 inactiveTrackColor: Colors.grey[300],
-                thumbColor: const Color(0xFF0984E3),
-                overlayColor: const Color(0xFF74B9FF).withOpacity(0.2),
-                valueIndicatorColor: const Color(0xFF0984E3),
+                thumbColor: _darkBlueColor,
+                overlayColor: _blueColor.withOpacity(0.2),
+                valueIndicatorColor: _darkBlueColor,
                 trackHeight: 4,
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
               ),
@@ -748,7 +860,7 @@ class _SalivationPageState extends State<SalivationPage> {
                   style: TextStyle(
                     fontSize: 10,
                     color: _answers[index] == i
-                        ? const Color(0xFF0984E3)
+                        ? _darkBlueColor
                         : Colors.grey[400],
                     fontWeight: _answers[index] == i
                         ? FontWeight.bold
@@ -762,14 +874,14 @@ class _SalivationPageState extends State<SalivationPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF74B9FF).withOpacity(0.1),
+                  color: _blueColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   'Выбрано: ${_answers[index]} баллов',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF0984E3),
+                    color: _darkBlueColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -779,5 +891,98 @@ class _SalivationPageState extends State<SalivationPage> {
         ),
       ),
     );
+  }
+}
+
+class SalivationFolderPage extends StatelessWidget {
+  final List<dynamic> records;
+
+  const SalivationFolderPage({Key? key, required this.records}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: const Text(
+          'Папка слюнотечения',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: const Color(0xFF74B9FF),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: records.isEmpty
+          ? const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.folder_open,
+              size: 64,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Нет сохраненных записей',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      )
+          : ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: records.length,
+        itemBuilder: (context, index) {
+          final record = records[index];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: const Color(0xFF74B9FF),
+                child: Text(
+                  '${record.complicationScore}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              title: Text(
+                'Балл: ${record.complicationScore}',
+                style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF0984E3)),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(record.notes ?? 'Без примечаний'),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Дата: ${_formatDate(record.createdAt)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+              trailing: record.complicationScore >= 10
+                  ? const Icon(Icons.warning, color: Colors.orange)
+                  : const Icon(Icons.check_circle, color: Colors.green),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dateTime) {
+    return '${dateTime.day.toString().padLeft(2, '0')}.${dateTime.month.toString().padLeft(2, '0')}.${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }

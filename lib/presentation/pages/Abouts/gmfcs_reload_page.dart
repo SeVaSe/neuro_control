@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../assets/colors/app_colors.dart';
+import '../../../assets/data/texts/strings.dart';
 import '../../../services/database_service.dart';
 
 class GMFCSUpdateScreen extends StatefulWidget {
@@ -11,60 +12,130 @@ class GMFCSUpdateScreen extends StatefulWidget {
 
 class _GMFCSUpdateScreenState extends State<GMFCSUpdateScreen> {
   int? selectedLevel;
-  Map<String, bool> answers = {};
-  final _dbService = DatabaseService();
-  static const _localPatientId = '1'; // локальный ID
+  int? selectedOption; // Какой уровень выбрал пользователь (1-5)
+  final DatabaseService _dbService = DatabaseService();
+  static const String _localPatientId = '1'; // Локальный ID
+  final AppStrongStrings _strings = AppStrongStrings();
+  int patientAge = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadExistingGMFCS();
+    _loadPatientData();
   }
 
-  void _loadExistingGMFCS() async {
-    final gmfs = await _dbService.getGMFCS(_localPatientId);
-    if (gmfs != null) {
+  void _loadPatientData() async {
+    // Загружаем дату рождения пациента
+    final birthDate = await _dbService.getPatientBirthDate(_localPatientId);
+    if (birthDate != null) {
+      final now = DateTime.now();
+      final age = now.year - birthDate.birthDate.year;
       setState(() {
-        selectedLevel = gmfs.level;
+        patientAge = age;
+      });
+    }
+
+    // Загружаем существующий GMFCS
+    final gmfcs = await _dbService.getGMFCS(_localPatientId);
+    if (gmfcs != null) {
+      setState(() {
+        selectedLevel = gmfcs.level;
+        selectedOption = gmfcs.level;
       });
     }
   }
 
-
-  final List<Map<String, dynamic>> questions = [
-    {
-      'question': 'Может ли пациент ходить без ограничений?',
-    },
-    {
-      'question': 'Может ли пациент ходить без вспомогательных средств?',
-    },
-    {
-      'question': 'Может ли пациент подниматься по лестнице с перилами?',
-    },
-    {
-      'question': 'Может ли пациент сидеть без поддержки?',
-    },
-  ];
-
-  void calculateGMFCS() {
-    int trueCount = answers.values.where((answer) => answer == true).length;
-
-    int level;
-    if (trueCount == 4) {
-      level = 1;
-    } else if (trueCount == 3) {
-      level = 2;
-    } else if (trueCount == 2) {
-      level = 3;
-    } else if (trueCount == 1) {
-      level = 4;
-    } else {
-      level = 5;
-    }
-
+  void _selectLevel(int level) {
     setState(() {
+      selectedOption = level;
       selectedLevel = level;
     });
+  }
+
+  void _showInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primaryColor.withOpacity(0.1),
+                  AppColors.secondryColor.withOpacity(0.05),
+                ],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: const Icon(
+                    Icons.info_outline,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Справка о GMFCS',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryColor,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'GMFCS (Gross Motor Function Classification System) - это система классификации, которая используется для оценки двигательных возможностей у детей с детским церебральным параличом (ДЦП). Она определяет пять уровней двигательных навыков, от I (наименьшие ограничения) до V (наибольшие ограничения), позволяя специалистам и родителям понять, какие двигательные функции доступны ребенку и какая помощь может потребоваться.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.justify,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Понятно',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -99,7 +170,16 @@ class _GMFCSUpdateScreenState extends State<GMFCSUpdateScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Ответьте на вопросы для переоценки функционального уровня',
+                'Уровень GMFCS',
+                style: TextStyle(
+                  fontSize: screenWidth * 0.07,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.mainTitleColor,
+                ),
+              ),
+              SizedBox(height: screenHeight * 0.01),
+              Text(
+                'Выберите описание, которое лучше всего подходит вашему ребенку (возраст: $patientAge лет)',
                 style: TextStyle(
                   fontSize: screenWidth * 0.04,
                   color: AppColors.text2Color,
@@ -110,54 +190,111 @@ class _GMFCSUpdateScreenState extends State<GMFCSUpdateScreen> {
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        itemCount: questions.length,
-                        itemBuilder: (context, index) {
-                          final question = questions[index];
-                          return Container(
-                            margin: EdgeInsets.only(bottom: screenHeight * 0.02),
-                            padding: EdgeInsets.all(screenWidth * 0.05),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(
-                                color: AppColors.border3Color,
-                                width: 1,
+                      // Генерируем 5 карточек с описаниями уровней
+                      ...List.generate(5, (index) {
+                        final level = index + 1;
+                        final description = _strings.getLevelDescription(patientAge, 'level $level');
+
+                        return Container(
+                          margin: EdgeInsets.only(bottom: screenHeight * 0.02),
+                          padding: EdgeInsets.all(screenWidth * 0.04),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(
+                              color: selectedOption == level
+                                  ? AppColors.primaryColor
+                                  : AppColors.border3Color,
+                              width: selectedOption == level ? 2 : 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: selectedOption == level
+                                    ? AppColors.primaryColor.withOpacity(0.1)
+                                    : Colors.grey.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  question['question'],
-                                  style: TextStyle(
-                                    fontSize: screenWidth * 0.04,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.text2Color,
+                            ],
+                          ),
+                          child: InkWell(
+                            onTap: () => _selectLevel(level),
+                            borderRadius: BorderRadius.circular(15),
+                            child: Padding(
+                              padding: EdgeInsets.all(screenWidth * 0.02),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    margin: const EdgeInsets.only(top: 4, right: 12),
+                                    decoration: BoxDecoration(
+                                      color: selectedOption == level
+                                          ? AppColors.primaryColor
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: selectedOption == level
+                                            ? AppColors.primaryColor
+                                            : Colors.grey.shade400,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: selectedOption == level
+                                        ? const Icon(
+                                      Icons.check,
+                                      size: 16,
+                                      color: Colors.white,
+                                    )
+                                        : null,
                                   ),
-                                ),
-                                SizedBox(height: screenHeight * 0.015),
-                                Row(
-                                  children: [
-                                    Expanded(child: _buildCheckbox('Да', question['question'], true)),
-                                    SizedBox(width: screenWidth * 0.05),
-                                    Expanded(child: _buildCheckbox('Нет', question['question'], false)),
-                                  ],
-                                ),
-                              ],
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: selectedOption == level
+                                                ? AppColors.primaryColor
+                                                : AppColors.secondryColor,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            'Уровень $level',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          description,
+                                          style: TextStyle(
+                                            fontSize: screenWidth * 0.035,
+                                            height: 1.4,
+                                            color: selectedOption == level
+                                                ? AppColors.primaryColor
+                                                : AppColors.text2Color,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      }),
+
+                      // Результат
                       if (selectedLevel != null) ...[
                         SizedBox(height: screenHeight * 0.02),
                         Container(
@@ -169,13 +306,17 @@ class _GMFCSUpdateScreenState extends State<GMFCSUpdateScreen> {
                           ),
                           child: Column(
                             children: [
-                              Icon(Icons.analytics, color: Colors.white, size: screenWidth * 0.1),
+                              Icon(
+                                Icons.analytics,
+                                color: Colors.white,
+                                size: screenWidth * 0.1,
+                              ),
                               SizedBox(height: screenHeight * 0.01),
-                              Text(
-                                'Ваш уровень GMFCS',
+                              const Text(
+                                'Выбранный уровень GMFCS',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: screenWidth * 0.04,
+                                  fontSize: 16,
                                 ),
                               ),
                               Text(
@@ -195,121 +336,104 @@ class _GMFCSUpdateScreenState extends State<GMFCSUpdateScreen> {
                   ),
                 ),
               ),
-              Container(
-                width: double.infinity,
-                height: screenHeight * 0.07,
-                constraints: BoxConstraints(minHeight: 50, maxHeight: 70),
-                decoration: BoxDecoration(
-                  gradient: answers.length == questions.length
-                      ? AppColors.primaryGradient
-                      : LinearGradient(colors: [Colors.grey.shade400, Colors.grey.shade500]),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(28),
-                    onTap: answers.length == questions.length
-                        ? () async {
-                      if (selectedLevel == null) return;
 
-                      try {
-                        final success = await _dbService.setGMFCS(_localPatientId, selectedLevel!);
-                        if (!success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Не удалось сохранить GMFCS')),
-                          );
-                          return;
-                        }
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('GMFCS уровень обновлён')),
-                        );
-
-                        Navigator.pop(context); // вернуться назад
-                      } catch (e) {
-                        print("Ошибка при сохранении GMFCS: $e");
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Ошибка сохранения GMFCS')),
-                        );
-                      }
-                    }
-                        : null,
-
-                    child: Center(
-                      child: Text(
-                        'Изменить',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: screenWidth * 0.045,
-                          fontWeight: FontWeight.w600,
+              // Кнопки внизу
+              Row(
+                children: [
+                  // Кнопка с иконкой вопроса
+                  Container(
+                    width: screenHeight * 0.07,
+                    height: screenHeight * 0.07,
+                    constraints: const BoxConstraints(
+                      minWidth: 50,
+                      minHeight: 50,
+                      maxWidth: 70,
+                      maxHeight: 70,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.primaryColor, width: 2),
+                      borderRadius: BorderRadius.circular(35),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(35),
+                        onTap: _showInfoDialog,
+                        child: Center(
+                          child: Icon(
+                            Icons.help_outline,
+                            color: AppColors.primaryColor,
+                            size: screenWidth * 0.06,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                  SizedBox(width: screenWidth * 0.04),
+                  // Кнопка "Изменить"
+                  Expanded(
+                    child: Container(
+                      height: screenHeight * 0.07,
+                      constraints: const BoxConstraints(
+                        minHeight: 50,
+                        maxHeight: 70,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: selectedLevel != null
+                            ? AppColors.primaryGradient
+                            : LinearGradient(
+                          colors: [Colors.grey.shade400, Colors.grey.shade500],
+                        ),
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(28),
+                          onTap: selectedLevel != null
+                              ? () async {
+                            if (selectedLevel == null) return;
+
+                            try {
+                              final success = await _dbService.setGMFCS(_localPatientId, selectedLevel!);
+                              if (!success) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Не удалось сохранить GMFCS')),
+                                );
+                                return;
+                              }
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('GMFCS уровень обновлён')),
+                              );
+
+                              Navigator.pop(context); // вернуться назад
+                            } catch (e) {
+                              print("Ошибка при сохранении GMFCS: $e");
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Ошибка сохранения GMFCS')),
+                              );
+                            }
+                          }
+                              : null,
+                          child: Center(
+                            child: Text(
+                              'Изменить',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: screenWidth * 0.045,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCheckbox(String label, String questionKey, bool value) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    bool isSelected = answers[questionKey] == value;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          answers[questionKey] = value;
-        });
-        calculateGMFCS();
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          vertical: screenWidth * 0.03,
-          horizontal: screenWidth * 0.04,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.text1Color.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? AppColors.text1Color : Colors.grey.shade300,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: screenWidth * 0.05,
-              height: screenWidth * 0.05,
-              constraints: BoxConstraints(minWidth: 18, minHeight: 18, maxWidth: 24, maxHeight: 24),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.text1Color : Colors.transparent,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: isSelected ? AppColors.text1Color : Colors.grey.shade400,
-                  width: 2,
-                ),
-              ),
-              child: isSelected
-                  ? Icon(Icons.check, size: screenWidth * 0.035, color: Colors.white)
-                  : null,
-            ),
-            SizedBox(width: screenWidth * 0.025),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: screenWidth * 0.04,
-                  fontWeight: FontWeight.w500,
-                  color: isSelected ? AppColors.text1Color : AppColors.text2Color,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

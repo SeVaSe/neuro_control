@@ -3,6 +3,7 @@ import 'package:flutter/services.dart'; // Для загрузки JSON из ass
 import '../../assets/colors/app_colors.dart';
 import '../../assets/data/texts/strings.dart';
 import '../pages/Abouts/autors_page.dart';
+import '../pages/Abouts/birth_date_reload_page.dart';
 import '../pages/Abouts/gmfcs_reload_page.dart';
 import '../pages/Abouts/instruction_page.dart';
 import '../pages/Abouts/video_hello_page.dart';
@@ -22,6 +23,120 @@ class _AboutProgramState extends State<AboutProgram> {
   void dispose() {
     _scrollController.dispose(); // Обязательно освобождаем контроллер
     super.dispose();
+  }
+
+  // Метод для показа диалога подтверждения изменения даты рождения
+  void _showBirthDateConfirmationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        final double screenWidth = MediaQuery.of(context).size.width;
+        final bool isTablet = screenWidth > 600;
+
+        return AlertDialog(
+          backgroundColor: AppColors.thirdColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: AppColors.errorColor,
+                size: isTablet ? 28.0 : 24.0,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Подтверждение изменения даты',
+                  style: TextStyle(
+                    color: AppColors.secondryColor,
+                    fontSize: isTablet ? 20.0 : 18.0,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'TinosBold',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Если вы измените дату рождения, это может повлиять на текущие данные пациента.',
+                style: TextStyle(
+                  color: AppColors.text2Color,
+                  fontSize: isTablet ? 16.0 : 14.0,
+                  fontWeight: FontWeight.w400,
+                  height: 1.4,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Вы точно хотите продолжить?',
+                style: TextStyle(
+                  color: AppColors.secondryColor,
+                  fontSize: isTablet ? 16.0 : 14.0,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 20.0 : 16.0,
+                  vertical: isTablet ? 12.0 : 10.0,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Отмена',
+                style: TextStyle(
+                  color: AppColors.text2Color,
+                  fontSize: isTablet ? 16.0 : 14.0,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => BirthDateReloadPage()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: AppColors.thirdColor,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 20.0 : 16.0,
+                  vertical: isTablet ? 12.0 : 10.0,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 2,
+              ),
+              child: Text(
+                'Продолжить',
+                style: TextStyle(
+                  fontSize: isTablet ? 16.0 : 14.0,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Метод для показа диалога подтверждения изменения GMFCS
@@ -315,7 +430,14 @@ class _AboutProgramState extends State<AboutProgram> {
                   screenHeight,
                   screenWidth,
                   null, // Передаем null, так как теперь используем специальную логику
-                  isGMFCS: true), // Добавляем новый флаг для GMFCS
+                  isGMFCS: true),
+              _buildButton(
+                  "Поменять дату рождения",
+                  Icons.update,
+                  screenHeight,
+                  screenWidth,
+                  BirthDateReloadPage(),
+                  isBirthDate: true),
               _buildButton(
                   AppStrings.buttonVideoAboutString,
                   Icons.play_circle_outline,
@@ -340,7 +462,6 @@ class _AboutProgramState extends State<AboutProgram> {
     );
   }
 
-  // Обновленный метод _buildButton с поддержкой GMFCS подтверждения
   Widget _buildButton(
       String text,
       IconData icon,
@@ -349,7 +470,8 @@ class _AboutProgramState extends State<AboutProgram> {
       Widget? destinationScreen, {
         bool isVideoWelcome = false,
         bool isStorage = false,
-        bool isGMFCS = false, // Новый флаг для GMFCS
+        bool isGMFCS = false,
+        bool isBirthDate = false, // новый флаг
       }) {
     return Column(
       children: [
@@ -394,22 +516,19 @@ class _AboutProgramState extends State<AboutProgram> {
               size: (screenWidth * 0.04).clamp(16.0, 20.0),
             ),
             onTap: () {
-              // Специальная обработка для GMFCS с подтверждением
               if (isGMFCS) {
                 _showGMFCSConfirmationDialog();
+              } else if (isBirthDate) {
+                _showBirthDateConfirmationDialog(); // показываем предупреждение для даты
               } else if (destinationScreen != null) {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => destinationScreen),
                 );
               } else {
-                String message;
-                if (isVideoWelcome) {
-                  message = 'Видео приветствие будет добавлено в следующих обновлениях!';
-                } else {
-                  message = 'Настройки появятся в следующих обновлениях!';
-                }
-
+                String message = isVideoWelcome
+                    ? 'Видео приветствие будет добавлено в следующих обновлениях!'
+                    : 'Настройки появятся в следующих обновлениях!';
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -431,8 +550,6 @@ class _AboutProgramState extends State<AboutProgram> {
             },
           ),
         ),
-
-        // Разделитель между кнопками
         Container(
           margin: EdgeInsets.symmetric(
             horizontal: screenWidth * 0.04,

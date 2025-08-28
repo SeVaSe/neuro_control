@@ -1066,10 +1066,10 @@ class _ExaminationSchedulePage extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: shouldVisit
-                  ? (isPatientColumn && isCurrentAge ? const Color(0xFF4CAF50) : const Color(0xFF66BB6A))
-                  : (isPatientColumn && isCurrentAge ? const Color(0xFFE6FFEB) : Colors.white),
+                  ? (isPatientColumn && isCurrentAge ? const Color(0xFF3F8841) : const Color(0xFF66BB6A))
+                  : (isPatientColumn && isCurrentAge ? const Color(0xFFAEE8B9) : Colors.white),
               border: isPatientColumn
-                  ? Border.all(color: const Color(0xFF4CAF50), width: 2)
+                  ? Border.all(color: const Color(0xFF387E3A), width: 2)
                   : null,
             ),
             child: Center(

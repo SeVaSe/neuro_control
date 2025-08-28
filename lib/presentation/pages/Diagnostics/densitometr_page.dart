@@ -581,7 +581,7 @@ class _DensitometrPageState extends State<DensitometrPage>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${_densitometries.length} заключений',
+                        '${_densitometries.length} записей',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 14,

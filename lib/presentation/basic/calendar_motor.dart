@@ -172,12 +172,12 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
           ),
           tabs: const [
             Tab(
-              icon: Icon(Icons.calendar_today),
+              icon: Icon(Icons.calendar_month),
               text: 'Календарь',
             ),
             Tab(
-              icon: Icon(Icons.list),
-              text: 'Список дней',
+              icon: Icon(Icons.folder_open),
+              text: 'Список навыков',
             ),
           ],
         ),
@@ -259,7 +259,7 @@ class _CalendarMotorPageState extends State<CalendarMotorPage>
                 shape: BoxShape.circle,
               ),
               markerDecoration: const BoxDecoration(
-                color: Color(0xFF10B981),
+                color: Color(0xFFFF7F00),
                 shape: BoxShape.circle,
               ),
               markersMaxCount: 3,

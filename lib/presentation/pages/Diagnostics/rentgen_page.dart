@@ -1066,11 +1066,11 @@ class _XraySchedulePage extends StatelessWidget {
       decoration: const BoxDecoration(color: Color(0xFFFF974D)),
       children: [
         _buildHeaderCell('Возраст'),
-        _buildHeaderCell('GMFCS I'),
-        _buildHeaderCell('GMFCS II'),
-        _buildHeaderCell('GMFCS III'),
-        _buildHeaderCell('GMFCS IV'),
-        _buildHeaderCell('GMFCS V'),
+        _buildHeaderCell('GMFCS 1'),
+        _buildHeaderCell('GMFCS 2'),
+        _buildHeaderCell('GMFCS 3'),
+        _buildHeaderCell('GMFCS 4'),
+        _buildHeaderCell('GMFCS 5'),
       ],
     );
   }
@@ -1129,11 +1129,11 @@ class _XraySchedulePage extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: shouldVisit
-                  ? (isPatientColumn && isCurrentAge ? const Color(0xFFFF974D) : const Color(
+                  ? (isPatientColumn && isCurrentAge ? const Color(0xFFB66C38) : const Color(
                   0xFFF38F4B))
-                  : (isPatientColumn && isCurrentAge ? const Color(0xFFFFF1E6) : Colors.white),
+                  : (isPatientColumn && isCurrentAge ? const Color(0xFFE8C3A5) : Colors.white),
               border: isPatientColumn
-                  ? Border.all(color: const Color(0xFFFF974D), width: 2)
+                  ? Border.all(color: const Color(0xFF9C5E32), width: 2)
                   : null,
             ),
             child: Center(
@@ -1141,7 +1141,7 @@ class _XraySchedulePage extends StatelessWidget {
                   ? const Text(
                 'x2 год',
                 style: TextStyle(
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
