@@ -6,6 +6,7 @@ import '../pages/Abouts/autors_page.dart';
 import '../pages/Abouts/birth_date_reload_page.dart';
 import '../pages/Abouts/gmfcs_reload_page.dart';
 import '../pages/Abouts/instruction_page.dart';
+import '../pages/Abouts/reminder_page.dart';
 import '../pages/Abouts/video_hello_page.dart';
 
 class AboutProgram extends StatefulWidget {
@@ -438,6 +439,12 @@ class _AboutProgramState extends State<AboutProgram> {
                   screenWidth,
                   BirthDateReloadPage(),
                   isBirthDate: true),
+              _buildButton(
+                  "Напоминания",
+                  Icons.notifications_active_outlined,
+                  screenHeight,
+                  screenWidth,
+                  ReminderPage()),
               _buildButton(
                   AppStrings.buttonVideoAboutString,
                   Icons.play_circle_outline,

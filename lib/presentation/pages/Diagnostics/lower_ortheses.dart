@@ -85,8 +85,8 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 768;
     final crossAxisCount = isTablet ? 2 : 1;
-    const primaryColor = Color(0xFFFD79A8);
-    const secondaryColor = Color(0xFFE84393);
+    const primaryColor = Color(0xFFF3C643);
+    const secondaryColor = Color(0xFFF1B102);
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -337,8 +337,8 @@ class OrthosisCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFFD79A8);
-    const secondaryColor = Color(0xFFE84393);
+    const primaryColor = Color(0xFFF3C643);
+    const secondaryColor = Color(0xFFF1B102);
 
     return GestureDetector(
       onTap: onTap,
@@ -515,8 +515,8 @@ class OrthosisDetailModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFFD79A8);
-    const secondaryColor = Color(0xFFE84393);
+    const primaryColor = Color(0xFFF3C643);
+    const secondaryColor = Color(0xFFF1B102);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
 
 import '../../../services/database_service.dart';
+import '../../../services/reminder_scheduler.dart';
 
 class SalivationPage extends StatefulWidget {
   const SalivationPage({Key? key}) : super(key: key);
@@ -28,7 +29,7 @@ class _SalivationPageState extends State<SalivationPage> {
   // Цвета
   final Color _blueColor = const Color(0xFF74B9FF);
   final Color _darkBlueColor = const Color(0xFF0984E3);
-  final Color _yellowColor = const Color(0xFFF39C12);
+  final Color _yellowColor = const Color(0xFFFFC107);
 
   // Вопросы теста
   final List<Map<String, String>> _questions = [
@@ -134,8 +135,17 @@ class _SalivationPageState extends State<SalivationPage> {
       final now = DateTime.now();
       _nextTestDate = DateTime(now.year, now.month + 3, now.day);
 
+
       // Добавляем напоминание в календарь
       await _addCalendarReminder();
+
+      final scheduler = ReminderScheduler(_databaseService);
+      await scheduler.scheduleReminder(
+        patientId: patientId,
+        appointmentDateTime: _nextTestDate!,
+        title: 'Пройти Анкету по слюнотечению',
+        description: 'У вас скоро запланировано прохождение Акеты по слюнотечению. Не забудьте провести данное обследование в приложении NeuroOrto.control!',
+      );
 
       // Обновляем список записей
       final updatedRecords = await _databaseService.getSalivations(patientId);

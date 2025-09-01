@@ -73,7 +73,7 @@ class _UpperOrthosesPageState extends State<UpperOrthosesPage> {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 768;
     final crossAxisCount = isTablet ? 2 : 1;
-    const primaryColor = Color(0xFFFDCB6E);
+    const primaryColor = Color(0xFFEC407A);
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -117,7 +117,7 @@ class _UpperOrthosesPageState extends State<UpperOrthosesPage> {
               },
               decoration: InputDecoration(
                 hintText: 'Поиск ортезов...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFFE17055)),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFCA2D61)),
                 suffixIcon: searchQuery.isNotEmpty
                     ? IconButton(
                   icon: const Icon(Icons.clear, color: Colors.grey),
@@ -161,7 +161,7 @@ class _UpperOrthosesPageState extends State<UpperOrthosesPage> {
             child: isLoading
                 ? const Center(
               child: CircularProgressIndicator(
-                color: Color(0xFFE17055),
+                color: Color(0xFFCA2D61),
               ),
             )
                 : orthoses.isEmpty
@@ -226,7 +226,7 @@ class _UpperOrthosesPageState extends State<UpperOrthosesPage> {
             )
                 : RefreshIndicator(
               onRefresh: loadOrthoses,
-              color: const Color(0xFFE17055),
+              color: const Color(0xFFCA2D61),
               child: GridView.builder(
                 padding: const EdgeInsets.all(16),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -297,7 +297,7 @@ class OrthosisCard extends StatelessWidget {
               decoration: const BoxDecoration(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 gradient: LinearGradient(
-                  colors: [Color(0xFFFDCB6E), Color(0xFFE17055)],
+                  colors: [Color(0xFFDC4D82), Color(0xFFCA2D61)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -311,7 +311,7 @@ class OrthosisCard extends StatelessWidget {
                     return Container(
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Color(0xFFFDCB6E), Color(0xFFE17055)],
+                          colors: [Color(0xFFDC4D82), Color(0xFFCA2D61)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -365,7 +365,7 @@ class OrthosisCard extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE17055).withOpacity(0.1),
+                        color: const Color(0xFFCA2D61).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -374,7 +374,7 @@ class OrthosisCard extends StatelessWidget {
                           Icon(
                             Icons.access_time,
                             size: 14,
-                            color: const Color(0xFFE17055),
+                            color: const Color(0xFFCA2D61),
                           ),
                           const SizedBox(width: 4),
                           Flexible(
@@ -382,7 +382,7 @@ class OrthosisCard extends StatelessWidget {
                               orthosis.wearingMode,
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFFE17055),
+                                color: Color(0xFFCA2D61),
                                 fontWeight: FontWeight.w500,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -445,7 +445,7 @@ class OrthosisDetailModal extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
                           gradient: const LinearGradient(
-                            colors: [Color(0xFFFDCB6E), Color(0xFFE17055)],
+                            colors: [Color(0xFFDC4D82), Color(0xFFCA2D61)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -493,7 +493,7 @@ class OrthosisDetailModal extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFFE17055),
+                                color: Color(0xFFCA2D61),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -513,14 +513,14 @@ class OrthosisDetailModal extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE17055).withOpacity(0.1),
+                          color: const Color(0xFFCA2D61).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
                             const Icon(
                               Icons.access_time,
-                              color: Color(0xFFE17055),
+                              color: Color(0xFFCA2D61),
                               size: 24,
                             ),
                             const SizedBox(width: 12),
@@ -533,7 +533,7 @@ class OrthosisDetailModal extends StatelessWidget {
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFFE17055),
+                                      color: Color(0xFFCA2D61),
                                     ),
                                   ),
                                   const SizedBox(height: 4),

@@ -1,3 +1,4 @@
+// database.dart
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -20,7 +21,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 3, // Увеличиваем версию для новой таблицы
+      version: 5, // Увеличили версию для обновления таблицы напоминаний
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -116,13 +117,36 @@ class AppDatabase {
       )
     ''');
 
-    // Новая таблица для хранения даты рождения пациентов
+    // Таблица для хранения даты рождения пациентов
     await db.execute('''
       CREATE TABLE patient_birth_date (
         patient_id TEXT PRIMARY KEY,
         birth_date INTEGER NOT NULL,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
+      )
+    ''');
+
+    // ОБНОВЛЕННАЯ ТАБЛИЦА: Таблица напоминаний с новыми полями
+    await db.execute('''
+      CREATE TABLE reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id TEXT NOT NULL,
+        event_date_time INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        notify_month_before INTEGER,
+        notify_2weeks_before INTEGER,
+        notify_day_before INTEGER,
+        notify_hour_before INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        is_completed INTEGER DEFAULT 0 CHECK (is_completed IN (0, 1)),
+        is_notification_sent INTEGER DEFAULT 0 CHECK (is_notification_sent IN (0, 1)),
+        is_month_sent INTEGER DEFAULT 0 CHECK (is_month_sent IN (0, 1)),
+        is_2weeks_sent INTEGER DEFAULT 0 CHECK (is_2weeks_sent IN (0, 1)),
+        is_day_sent INTEGER DEFAULT 0 CHECK (is_day_sent IN (0, 1)),
+        is_hour_sent INTEGER DEFAULT 0 CHECK (is_hour_sent IN (0, 1))
       )
     ''');
 
@@ -192,6 +216,17 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
     await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
 
+    // ОБНОВЛЕННЫЕ ИНДЕКСЫ для таблицы напоминаний
+    await db.execute('CREATE INDEX idx_reminders_patient ON reminders(patient_id)');
+    await db.execute('CREATE INDEX idx_reminders_datetime ON reminders(event_date_time)');
+    await db.execute('CREATE INDEX idx_reminders_completed ON reminders(is_completed)');
+    await db.execute('CREATE INDEX idx_reminders_notification ON reminders(is_notification_sent)');
+    await db.execute('CREATE INDEX idx_reminders_patient_datetime ON reminders(patient_id, event_date_time)');
+    await db.execute('CREATE INDEX idx_reminders_notify_month ON reminders(notify_month_before)');
+    await db.execute('CREATE INDEX idx_reminders_notify_2weeks ON reminders(notify_2weeks_before)');
+    await db.execute('CREATE INDEX idx_reminders_notify_day ON reminders(notify_day_before)');
+    await db.execute('CREATE INDEX idx_reminders_notify_hour ON reminders(notify_hour_before)');
+
     await _insertInitialReferenceGuides(db);
     await _insertInitialInstructions(db);
   }
@@ -243,6 +278,50 @@ class AppDatabase {
       await db.execute('CREATE INDEX idx_reference_images_guide ON reference_guide_images(reference_guide_id)');
       await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
       await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
+    }
+
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE reminders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          patient_id TEXT NOT NULL,
+          reminder_date_time INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          is_completed INTEGER DEFAULT 0 CHECK (is_completed IN (0, 1)),
+          is_notification_sent INTEGER DEFAULT 0 CHECK (is_notification_sent IN (0, 1))
+        )
+      ''');
+
+      // Индексы для таблицы напоминаний
+      await db.execute('CREATE INDEX idx_reminders_patient ON reminders(patient_id)');
+      await db.execute('CREATE INDEX idx_reminders_datetime ON reminders(reminder_date_time)');
+      await db.execute('CREATE INDEX idx_reminders_completed ON reminders(is_completed)');
+      await db.execute('CREATE INDEX idx_reminders_notification ON reminders(is_notification_sent)');
+      await db.execute('CREATE INDEX idx_reminders_patient_datetime ON reminders(patient_id, reminder_date_time)');
+    }
+
+    // НОВОЕ: Обновляем таблицу напоминаний в версии 5
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE reminders RENAME COLUMN reminder_date_time TO event_date_time;');
+      await db.execute('ALTER TABLE reminders ADD COLUMN notify_month_before INTEGER;');
+      await db.execute('ALTER TABLE reminders ADD COLUMN notify_2weeks_before INTEGER;');
+      await db.execute('ALTER TABLE reminders ADD COLUMN notify_day_before INTEGER;');
+      await db.execute('ALTER TABLE reminders ADD COLUMN notify_hour_before INTEGER;');
+      await db.execute('ALTER TABLE reminders ADD COLUMN is_month_sent INTEGER DEFAULT 0;');
+      await db.execute('ALTER TABLE reminders ADD COLUMN is_2weeks_sent INTEGER DEFAULT 0;');
+      await db.execute('ALTER TABLE reminders ADD COLUMN is_day_sent INTEGER DEFAULT 0;');
+      await db.execute('ALTER TABLE reminders ADD COLUMN is_hour_sent INTEGER DEFAULT 0;');
+
+      // Обновляем индексы, если нужно
+      await db.execute('DROP INDEX IF EXISTS idx_reminders_datetime;');
+      await db.execute('CREATE INDEX idx_reminders_datetime ON reminders(event_date_time);');
+      await db.execute('CREATE INDEX idx_reminders_notify_month ON reminders(notify_month_before);');
+      await db.execute('CREATE INDEX idx_reminders_notify_2weeks ON reminders(notify_2weeks_before);');
+      await db.execute('CREATE INDEX idx_reminders_notify_day ON reminders(notify_day_before);');
+      await db.execute('CREATE INDEX idx_reminders_notify_hour ON reminders(notify_hour_before);');
     }
   }
 

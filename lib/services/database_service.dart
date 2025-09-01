@@ -20,6 +20,8 @@ import '../database/entities/reference_guide_image.dart';
 import '../database/entities/operation_manual.dart';
 import '../database/entities/operation_manual_image.dart';
 import '../database/entities/patient_birth_date.dart';
+import '../database/entities/reminder.dart';
+import '../database/dao/reminder_dao.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -34,6 +36,7 @@ class DatabaseService {
   final ReferenceGuideDAO _referenceGuideDAO = ReferenceGuideDAO();
   final OperationManualDAO _operationManualDAO = OperationManualDAO();
   final PatientBirthDateDAO _patientBirthDateDAO = PatientBirthDateDAO();
+  final ReminderDAO _reminderDAO = ReminderDAO();
 
   // =============================================================================
   // ОРТОПЕДИЧЕСКИЕ ОСМОТРЫ
@@ -483,7 +486,7 @@ class DatabaseService {
       'latestGMFCS': latestGMFCS,
       'totalExaminations': orthopedicExaminations.length,
       'totalDensitometries': densitometries.length,
-      'totalMotorSkills': motorSkills.length,
+      'totalMotorSkills': motorSkills.length
     };
   }
 
@@ -589,4 +592,135 @@ class DatabaseService {
     final result = await _patientBirthDateDAO.deleteByPatient(patientId);
     return result > 0;
   }
+
+
+// =============================================================================
+// НАПОМИНАНИЯ
+// =============================================================================
+
+  /// Создать новое напоминание
+  Future<int> createReminder(
+      String patientId,
+      DateTime eventDateTime,
+      String title,
+      {String? description,
+        DateTime? notifyMonthBefore,
+        DateTime? notify2WeeksBefore,
+        DateTime? notifyDayBefore,
+        DateTime? notifyHourBefore,}
+      ) async {
+    final now = DateTime.now();
+    final reminder = Reminder(
+      patientId: patientId,
+      eventDateTime: eventDateTime,
+      title: title,
+      description: description,
+      notifyMonthBefore: notifyMonthBefore,
+      notify2WeeksBefore: notify2WeeksBefore,
+      notifyDayBefore: notifyDayBefore,
+      notifyHourBefore: notifyHourBefore,
+      createdAt: now,
+      updatedAt: now,
+    );
+    return await _reminderDAO.insert(reminder);
+  }
+
+  /// Получить все напоминания пациента
+  Future<List<Reminder>> getPatientReminders(String patientId) async {
+    return await _reminderDAO.getByPatient(patientId);
+  }
+
+  /// Получить активные напоминания пациента
+  Future<List<Reminder>> getActiveReminders(String patientId) async {
+    return await _reminderDAO.getActiveByPatient(patientId);
+  }
+
+  /// Получить завершенные напоминания пациента
+  Future<List<Reminder>> getCompletedReminders(String patientId) async {
+    return await _reminderDAO.getCompletedByPatient(patientId);
+  }
+
+  /// Получить просроченные напоминания
+  Future<List<Reminder>> getOverdueReminders(String patientId) async {
+    return await _reminderDAO.getOverdueByPatient(patientId);
+  }
+
+  /// Получить предстоящие напоминания (на 24 часа)
+  Future<List<Reminder>> getUpcomingReminders(String patientId) async {
+    return await _reminderDAO.getUpcomingByPatient(patientId);
+  }
+
+  /// Получить конкретное напоминание по ID
+  Future<Reminder?> getReminder(int id) async {
+    return await _reminderDAO.getById(id);
+  }
+
+  /// Обновить напоминание
+  Future<bool> updateReminder(Reminder reminder) async {
+    final updatedReminder = reminder.copyWith(updatedAt: DateTime.now());
+    final result = await _reminderDAO.update(updatedReminder);
+    return result > 0;
+  }
+
+  /// Пометить напоминание как выполненное
+  Future<bool> markReminderCompleted(int id) async {
+    final result = await _reminderDAO.markAsCompleted(id);
+    return result > 0;
+  }
+
+  /// Пометить конкретное уведомление как отправленное
+  Future<bool> markSpecificNotificationSent(int id, String type) async {
+    final result = await _reminderDAO.markSpecificNotificationSent(id, type);
+    return result > 0;
+  }
+
+  /// Пометить уведомление как отправленное (для обратной совместимости)
+  Future<bool> markNotificationSent(int id) async {
+    final result = await _reminderDAO.markNotificationSent(id);
+    return result > 0;
+  }
+
+  /// Удалить напоминание
+  Future<bool> deleteReminder(int id) async {
+    final result = await _reminderDAO.delete(id);
+    return result > 0;
+  }
+
+  /// Удалить все напоминания пациента
+  Future<bool> deleteAllPatientReminders(String patientId) async {
+    final result = await _reminderDAO.deleteByPatient(patientId);
+    return result > 0;
+  }
+
+  /// Поиск напоминаний по заголовку
+  Future<List<Reminder>> searchReminders(String patientId, String query) async {
+    return await _reminderDAO.searchByTitle(patientId, query);
+  }
+
+  /// Получить напоминания за период
+  Future<List<Reminder>> getRemindersInDateRange(
+      String patientId,
+      DateTime startDate,
+      DateTime endDate,
+      ) async {
+    return await _reminderDAO.getByPatientAndDateRange(patientId, startDate, endDate);
+  }
+
+  /// Получить статистику напоминаний пациента
+  Future<Map<String, int>> getRemindersStats(String patientId) async {
+    return await _reminderDAO.getStatsByPatient(patientId);
+  }
+
+  /// Получить напоминания для отправки уведомлений
+  Future<List<Reminder>> getNotificationPendingReminders() async {
+    return await _reminderDAO.getNotificationPending();
+  }
+
+  /// Удалить старые завершенные напоминания
+  Future<bool> cleanupOldReminders({Duration olderThan = const Duration(days: 30)}) async {
+    final result = await _reminderDAO.deleteOldCompleted(olderThan);
+    return result > 0;
+  }
 }
+
+

@@ -9,6 +9,7 @@ import 'dart:io';
 
 import '../../../database/entities/xray_image.dart';
 import '../../../services/database_service.dart';
+import '../../../services/reminder_scheduler.dart';
 
 class RentgenPage extends StatefulWidget {
   final String patientId;
@@ -176,7 +177,7 @@ class _RentgenPageState extends State<RentgenPage>
   Future<void> _scheduleReminder() async {
     final DateTime? selectedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 30)),
+      initialDate: DateTime.now().add(const Duration(days: 0)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
       builder: (context, child) {
@@ -215,6 +216,14 @@ class _RentgenPageState extends State<RentgenPage>
     );
 
     await _addToCalendar(appointmentDateTime);
+
+    final scheduler = ReminderScheduler(_databaseService);
+    await scheduler.scheduleReminder(
+      patientId: widget.patientId,
+      appointmentDateTime: appointmentDateTime,
+      title: 'Скоро делать рентгенограмму ТБС',
+      description: 'У вас скоро запланирован прием для проведения рентгенографии. Не забудьте подготовиться к визиту!',
+    );
   }
 
   Future<void> _addToCalendar(DateTime appointmentDateTime) async {

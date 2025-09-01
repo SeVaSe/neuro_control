@@ -10,6 +10,7 @@ import 'dart:io';
 import '../../../database/entities/orthopedic_examination.dart';
 import '../../../database/entities/photo_record.dart';
 import '../../../services/database_service.dart';
+import '../../../services/reminder_scheduler.dart';
 
 class OrtopedPage extends StatefulWidget {
   final String patientId;
@@ -174,7 +175,7 @@ class _OrtopedPageState extends State<OrtopedPage>
   Future<void> _scheduleReminder() async {
     final DateTime? selectedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 30)),
+      initialDate: DateTime.now().add(const Duration(days: 0)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
       builder: (context, child) {
@@ -213,7 +214,17 @@ class _OrtopedPageState extends State<OrtopedPage>
     );
 
     await _addToCalendar(appointmentDateTime);
+
+
+    final scheduler = ReminderScheduler(_databaseService);
+    await scheduler.scheduleReminder(
+      patientId: widget.patientId,
+      appointmentDateTime: appointmentDateTime,
+      title: 'Скоро прием ортопеда',
+      description: 'У вас скоро запланирован прием ортопеда. Не забудьте подготовиться к визиту!',
+    );
   }
+
 
   Future<void> _addToCalendar(DateTime appointmentDateTime) async {
     try {

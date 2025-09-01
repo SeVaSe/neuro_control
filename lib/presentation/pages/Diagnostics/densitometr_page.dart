@@ -486,116 +486,31 @@ class _DensitometrPageState extends State<DensitometrPage>
   }
 
   Widget _buildActionCards() {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        GestureDetector(
-          onTap: _isUploading ? null : _addDensitometryFile,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
+        Expanded(
+          child: GestureDetector(
+            onTap: _isUploading ? null : _addDensitometryFile,
+            child: _buildCard(
+              isUploading: _isUploading,
+              icon: Icons.add_a_photo,
+              title: _isUploading ? 'Сохранение...' : 'Добавить заключение',
+              subtitle: 'Загрузить файл',
               color: primaryColor,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _isUploading
-                    ? const SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 3,
-                  ),
-                )
-                    : const Icon(
-                  Icons.add_a_photo,
-                  color: Colors.white,
-                  size: 48,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _isUploading ? 'Сохранение...' : 'Добавить заключение',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Сфотографировать или загрузить файл',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: _navigateToFolder,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
+        const SizedBox(width: 16),
+        Expanded(
+          child: GestureDetector(
+            onTap: _navigateToFolder,
+            child: _buildCard(
+              isUploading: false,
+              icon: Icons.folder,
+              title: 'Папка денситометрии',
+              subtitle: '${_densitometries.length} записей',
               color: yellowColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: yellowColor.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.folder,
-                  color: Colors.white,
-                  size: 36,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Папка денситометрии',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_densitometries.length} записей',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ],
             ),
           ),
         ),
@@ -603,6 +518,86 @@ class _DensitometrPageState extends State<DensitometrPage>
     );
   }
 
+
+  Widget _buildCard({
+    required bool isUploading,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    IconData? trailingIcon,
+  }) {
+    return AspectRatio(
+      aspectRatio: 1.0,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (isUploading)
+              const SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              )
+            else
+              Icon(
+                icon,
+                color: Colors.white,
+                size: 36,
+              ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (trailingIcon != null) ...[
+              const Spacer(),
+              Icon(
+                trailingIcon,
+                color: Colors.white,
+                size: 16,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // Страница папки денситометрии
