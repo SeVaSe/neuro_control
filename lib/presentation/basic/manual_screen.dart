@@ -61,7 +61,8 @@ class _ManualScreenState extends State<ManualScreen> {
           ? allGuides
           : allGuides.where((guide) =>
       guide.title.toLowerCase().contains(query) ||
-          (guide.category?.toLowerCase().contains(query) ?? false)).toList();
+          (guide.category?.toLowerCase().contains(query) ?? false) ||
+          guide.content.toLowerCase().contains(query)).toList();
     });
   }
 
@@ -78,6 +79,8 @@ class _ManualScreenState extends State<ManualScreen> {
           content: guide.content,
           category: guide.category,
           guideId: guide.id!,
+          referenceType: guide.type,
+          pdfPath: guide.pdfPath,
         ),
       ),
     );
@@ -109,7 +112,7 @@ class _ManualScreenState extends State<ManualScreen> {
               pinned: true,
               floating: false,
               snap: false,
-              expandedHeight: 130,
+              expandedHeight: 100,
               systemOverlayStyle: const SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
                 statusBarIconBrightness: Brightness.light,
@@ -117,18 +120,6 @@ class _ManualScreenState extends State<ManualScreen> {
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: BoxDecoration(color: AppColors.primaryColor),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 80, 24, 0),
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
               ),
               bottom: PreferredSize(
@@ -151,7 +142,7 @@ class _ManualScreenState extends State<ManualScreen> {
                 child: TextField(
                   controller: searchController,
                   decoration: InputDecoration(
-                    hintText: 'Поиск по названию или категории...',
+                    hintText: 'Поиск по названию, категории или содержимому...',
                     hintStyle: TextStyle(
                       color: Colors.grey[600],
                       fontSize: isTablet ? 16 : 14,

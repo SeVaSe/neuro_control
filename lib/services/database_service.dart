@@ -1,4 +1,6 @@
 // lib/services/database_service.dart
+import 'package:neuro_control/services/pdf_service.dart';
+
 import '../database/dao/orthopedic_dao.dart';
 import '../database/dao/densitometry_dao.dart';
 import '../database/dao/salivation_dao.dart';
@@ -37,6 +39,8 @@ class DatabaseService {
   final OperationManualDAO _operationManualDAO = OperationManualDAO();
   final PatientBirthDateDAO _patientBirthDateDAO = PatientBirthDateDAO();
   final ReminderDAO _reminderDAO = ReminderDAO();
+  final PdfService _pdfService = PdfService();
+
 
   // =============================================================================
   // ОРТОПЕДИЧЕСКИЕ ОСМОТРЫ
@@ -323,7 +327,7 @@ class DatabaseService {
   // СПРАВОЧНИК
   // =============================================================================
 
-  /// Добавить новую запись в справочник
+  /// Добавить новую запись в справочник (БД)
   Future<int> addReferenceGuide(String title, String content, {String? category}) async {
     final now = DateTime.now();
     final guide = ReferenceGuide(
@@ -332,23 +336,102 @@ class DatabaseService {
       category: category,
       createdAt: now,
       updatedAt: now,
+      type: ReferenceType.database,
     );
     return await _referenceGuideDAO.insertGuide(guide);
   }
 
-  /// Получить все записи справочника
+  /// Добавить PDF справочник
+  Future<int> addPdfReferenceGuide({
+    required String title,
+    required String assetPdfPath,
+    required String fileName,
+    String? category,
+  }) async {
+    try {
+      // Копируем PDF из assets
+      final localPdfPath = await _pdfService.copyPdfFromAssets(assetPdfPath, fileName);
+
+      // Создаем запись без контента (будет загружен позже)
+      final guide = ReferenceGuide.fromPdf(
+        title: title,
+        pdfPath: localPdfPath,
+        category: category,
+      );
+
+      return await _referenceGuideDAO.insertGuide(guide);
+    } catch (e) {
+      throw Exception('Ошибка добавления PDF справочника: $e');
+    }
+  }
+
+  /// Получить все записи справочника (БД + PDF)
   Future<List<ReferenceGuide>> getAllReferenceGuides() async {
-    return await _referenceGuideDAO.getAllGuides();
+    final guides = await _referenceGuideDAO.getAllGuides();
+
+    // Загружаем контент для PDF файлов, которые еще не загружены
+    final updatedGuides = <ReferenceGuide>[];
+
+    for (final guide in guides) {
+      if (guide.needsContentLoading && guide.pdfPath != null) {
+        try {
+          final content = await _pdfService.extractTextFromPdf(guide.pdfPath!);
+          final updatedGuide = guide.copyWith(
+            content: content,
+            isPdfLoaded: true,
+            updatedAt: DateTime.now(),
+          );
+
+          // Обновляем в БД
+          await _referenceGuideDAO.updateGuide(updatedGuide);
+          updatedGuides.add(updatedGuide);
+        } catch (e) {
+          // Если ошибка загрузки PDF, добавляем как есть с пометкой об ошибке
+          final errorGuide = guide.copyWith(
+            content: 'Ошибка загрузки PDF: $e',
+            isPdfLoaded: false,
+          );
+          updatedGuides.add(errorGuide);
+        }
+      } else {
+        updatedGuides.add(guide);
+      }
+    }
+
+    return updatedGuides;
   }
 
   /// Получить записи справочника по категории
   Future<List<ReferenceGuide>> getReferenceGuidesByCategory(String category) async {
-    return await _referenceGuideDAO.getGuidesByCategory(category);
+    final guides = await _referenceGuideDAO.getGuidesByCategory(category);
+    return await _loadPdfContentIfNeeded(guides);
   }
 
   /// Получить конкретную запись справочника
   Future<ReferenceGuide?> getReferenceGuide(int id) async {
-    return await _referenceGuideDAO.getGuideById(id);
+    final guide = await _referenceGuideDAO.getGuideById(id);
+    if (guide == null) return null;
+
+    if (guide.needsContentLoading && guide.pdfPath != null) {
+      try {
+        final content = await _pdfService.extractTextFromPdf(guide.pdfPath!);
+        final updatedGuide = guide.copyWith(
+          content: content,
+          isPdfLoaded: true,
+          updatedAt: DateTime.now(),
+        );
+
+        await _referenceGuideDAO.updateGuide(updatedGuide);
+        return updatedGuide;
+      } catch (e) {
+        return guide.copyWith(
+          content: 'Ошибка загрузки PDF: $e',
+          isPdfLoaded: false,
+        );
+      }
+    }
+
+    return guide;
   }
 
   /// Обновить запись справочника
@@ -360,13 +443,94 @@ class DatabaseService {
 
   /// Удалить запись справочника
   Future<bool> deleteReferenceGuide(int id) async {
+    final guide = await _referenceGuideDAO.getGuideById(id);
+
+    // Если это PDF, удаляем файл
+    if (guide?.type == ReferenceType.pdf && guide?.pdfPath != null) {
+      await _pdfService.deletePdf(guide!.pdfPath!);
+    }
+
     final result = await _referenceGuideDAO.deleteGuide(id);
     return result > 0;
   }
 
   /// Поиск по справочнику
   Future<List<ReferenceGuide>> searchReferenceGuides(String query) async {
-    return await _referenceGuideDAO.searchGuides(query);
+    final guides = await _referenceGuideDAO.searchGuides(query);
+    return await _loadPdfContentIfNeeded(guides);
+  }
+
+  /// Принудительно перезагрузить контент PDF
+  Future<ReferenceGuide?> reloadPdfContent(int guideId) async {
+    final guide = await _referenceGuideDAO.getGuideById(guideId);
+    if (guide == null || guide.type != ReferenceType.pdf || guide.pdfPath == null) {
+      return guide;
+    }
+
+    try {
+      final content = await _pdfService.extractTextFromPdf(guide.pdfPath!);
+      final updatedGuide = guide.copyWith(
+        content: content,
+        isPdfLoaded: true,
+        updatedAt: DateTime.now(),
+      );
+
+      await _referenceGuideDAO.updateGuide(updatedGuide);
+      return updatedGuide;
+    } catch (e) {
+      throw Exception('Ошибка перезагрузки PDF контента: $e');
+    }
+  }
+
+  /// Получить статистику справочника
+  Future<Map<String, dynamic>> getReferenceGuideStats() async {
+    final guides = await _referenceGuideDAO.getAllGuides();
+
+    final dbGuides = guides.where((g) => g.type == ReferenceType.database).length;
+    final pdfGuides = guides.where((g) => g.type == ReferenceType.pdf).length;
+    final loadedPdfGuides = guides.where((g) => g.type == ReferenceType.pdf && g.isPdfLoaded).length;
+
+    return {
+      'total': guides.length,
+      'database': dbGuides,
+      'pdf': pdfGuides,
+      'pdf_loaded': loadedPdfGuides,
+      'pdf_pending': pdfGuides - loadedPdfGuides,
+    };
+  }
+
+  // =============================================================================
+  // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+  // =============================================================================
+
+  /// Загружает контент PDF для списка справочников при необходимости
+  Future<List<ReferenceGuide>> _loadPdfContentIfNeeded(List<ReferenceGuide> guides) async {
+    final updatedGuides = <ReferenceGuide>[];
+
+    for (final guide in guides) {
+      if (guide.needsContentLoading && guide.pdfPath != null) {
+        try {
+          final content = await _pdfService.extractTextFromPdf(guide.pdfPath!);
+          final updatedGuide = guide.copyWith(
+            content: content,
+            isPdfLoaded: true,
+            updatedAt: DateTime.now(),
+          );
+
+          await _referenceGuideDAO.updateGuide(updatedGuide);
+          updatedGuides.add(updatedGuide);
+        } catch (e) {
+          updatedGuides.add(guide.copyWith(
+            content: 'Ошибка загрузки PDF: $e',
+            isPdfLoaded: false,
+          ));
+        }
+      } else {
+        updatedGuides.add(guide);
+      }
+    }
+
+    return updatedGuides;
   }
 
   /// Добавить изображение к записи справочника

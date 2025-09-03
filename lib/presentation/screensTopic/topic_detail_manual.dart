@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../services/database_service.dart';
-import '../../database/entities/reference_guide_image.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import '../../database/entities/reference_guide.dart';
 import '../../assets/colors/app_colors.dart';
 
 class TopicDetailScreen extends StatefulWidget {
@@ -8,6 +8,8 @@ class TopicDetailScreen extends StatefulWidget {
   final String content;
   final String? category;
   final int guideId;
+  final ReferenceType referenceType;
+  final String? pdfPath;
 
   const TopicDetailScreen({
     Key? key,
@@ -15,6 +17,8 @@ class TopicDetailScreen extends StatefulWidget {
     required this.content,
     this.category,
     required this.guideId,
+    this.referenceType = ReferenceType.database,
+    this.pdfPath,
   }) : super(key: key);
 
   @override
@@ -22,40 +26,7 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> {
-  final DatabaseService _databaseService = DatabaseService();
-
-  List<ReferenceGuideImage> images = [];
-  bool isLoadingImages = true;
-  String? errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadImages();
-  }
-
-  /// Загрузка изображений для записи справочника
-  Future<void> _loadImages() async {
-    try {
-      setState(() {
-        isLoadingImages = true;
-        errorMessage = null;
-      });
-
-      final guideImages = await _databaseService.getReferenceGuideImages(widget.guideId);
-
-      setState(() {
-        images = guideImages;
-        isLoadingImages = false;
-      });
-    } catch (e) {
-      setState(() {
-        errorMessage = 'Ошибка загрузки изображений: $e';
-        isLoadingImages = false;
-      });
-      debugPrint('Ошибка загрузки изображений: $e');
-    }
-  }
+  final ScrollController _scrollController = ScrollController();
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +34,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     final isTablet = screenSize.width > 600;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: AppColors.primaryColor,
         iconTheme: const IconThemeData(color: AppColors.thirdColor),
@@ -73,325 +45,292 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             fontWeight: FontWeight.bold,
             color: AppColors.thirdColor,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
-        elevation: 2,
+        elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isTablet ? 24 : 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Категория (если есть)
-            if (widget.category != null && widget.category!.isNotEmpty) ...[
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 16 : 12,
-                  vertical: isTablet ? 8 : 6,
-                ),
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  widget.category!,
-                  style: TextStyle(
-                    color: AppColors.thirdColor,
-                    fontSize: isTablet ? 14 : 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              SizedBox(height: isTablet ? 20 : 16),
-            ],
-
-            // Заголовок
-            Text(
-              widget.title,
-              style: TextStyle(
-                fontSize: isTablet ? 26 : 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primaryColor,
-                height: 1.3,
-              ),
-            ),
-
-            SizedBox(height: isTablet ? 24 : 20),
-
-            // Основной контент
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
-              decoration: BoxDecoration(
-                color: AppColors.thirdColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: SelectableText(
-                widget.content,
-                style: TextStyle(
-                  fontSize: isTablet ? 16 : 14,
-                  height: 1.6,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-
-            // Изображения
-            if (!isLoadingImages && images.isNotEmpty) ...[
-              SizedBox(height: isTablet ? 32 : 24),
-              Text(
-                'Изображения',
-                style: TextStyle(
-                  fontSize: isTablet ? 20 : 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryColor,
-                ),
-              ),
-              SizedBox(height: isTablet ? 16 : 12),
-              _buildImagesSection(isTablet),
-            ],
-
-            // Загрузка изображений
-            if (isLoadingImages) ...[
-              SizedBox(height: isTablet ? 32 : 24),
-              const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryColor),
-                ),
-              ),
-            ],
-
-            // Ошибка загрузки изображений
-            if (errorMessage != null) ...[
-              SizedBox(height: isTablet ? 32 : 24),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(isTablet ? 16 : 12),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      color: Colors.red[600],
-                      size: isTablet ? 24 : 20,
-                    ),
-                    SizedBox(width: isTablet ? 12 : 8),
-                    Expanded(
-                      child: Text(
-                        errorMessage!,
-                        style: TextStyle(
-                          color: Colors.red[600],
-                          fontSize: isTablet ? 14 : 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            // Дополнительное пространство внизу
-            SizedBox(height: isTablet ? 32 : 24),
-          ],
-        ),
-      ),
+      body: widget.referenceType == ReferenceType.pdf
+          ? _buildPdfContent()
+          : _buildDatabaseContent(isTablet),
     );
   }
 
-  Widget _buildImagesSection(bool isTablet) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: isTablet ? 3 : 2,
-        crossAxisSpacing: isTablet ? 16 : 12,
-        mainAxisSpacing: isTablet ? 16 : 12,
-        childAspectRatio: 1.2,
-      ),
-      itemCount: images.length,
-      itemBuilder: (context, index) {
-        final image = images[index];
-        return _buildImageCard(image, isTablet);
-      },
-    );
-  }
+  // ---------------------------
+  // Контент для PDF файлов
+  // ---------------------------
+  Widget _buildPdfContent() {
+    final path = widget.pdfPath;
 
-  Widget _buildImageCard(ReferenceGuideImage image, bool isTablet) {
-    return GestureDetector(
-      onTap: () => _showImageDialog(image),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Stack(
-            children: [
-              // Изображение
-              Image.asset(
-                image.imagePath,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[200],
-                    child: Icon(
-                      Icons.broken_image,
-                      color: Colors.grey[400],
-                      size: isTablet ? 48 : 32,
-                    ),
-                  );
-                },
-              ),
+    if (path == null || path.isEmpty) {
+      return const _CenteredInfo(
+        icon: Icons.picture_as_pdf_outlined,
+        title: 'PDF не найден',
+        subtitle: 'Путь к файлу не задан',
+      );
+    }
 
-              // Описание (если есть)
-              if (image.description != null && image.description!.isNotEmpty)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: EdgeInsets.all(isTablet ? 8 : 6),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.7),
-                        ],
-                      ),
-                    ),
-                    child: Text(
-                      image.description!,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isTablet ? 12 : 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    // Явно ожидаем путь от корня lib:
+    // lib/assets/data/pdf/your_file.pdf
+    if (!path.startsWith('lib/assets/data/pdf/')) {
+      return _ErrorPanel(
+        message:
+        'Ожидается путь вида:\nlib/assets/data/pdf/<имя_файла>.pdf\nПолучено:\n$path',
+      );
+    }
 
-  void _showImageDialog(ReferenceGuideImage image) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Stack(
-            children: [
-              // Изображение
-              Center(
-                child: InteractiveViewer(
-                  child: Image.asset(
-                    image.imagePath,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.broken_image,
-                              color: Colors.grey[400],
-                              size: 64,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Не удалось загрузить изображение',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-
-              // Кнопка закрытия
-              Positioned(
-                top: 40,
-                right: 20,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ),
-
-              // Описание внизу
-              if (image.description != null && image.description!.isNotEmpty)
-                Positioned(
-                  bottom: 40,
-                  left: 20,
-                  right: 20,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      image.description!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
+    return SfPdfViewer.asset(
+      path, // без каких-либо преобразований
+      enableDoubleTapZooming: true,
+      enableTextSelection: true,
+      canShowScrollHead: true,
+      canShowScrollStatus: true,
+      canShowPaginationDialog: true,
+      onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки PDF: ${details.error}'),
+            backgroundColor: Colors.red,
           ),
         );
       },
+      onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+            Text('PDF загружен. Страниц: ${details.document.pages.count}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+    );
+  }
+
+  // ---------------------------
+  // Контент для записей БД
+  // ---------------------------
+  Widget _buildDatabaseContent(bool isTablet) {
+    return CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        // Заголовок с информацией
+        SliverToBoxAdapter(
+          child: Container(
+            color: AppColors.primaryColor,
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(isTablet ? 24 : 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.category != null &&
+                          widget.category!.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 16 : 12,
+                            vertical: isTablet ? 8 : 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.thirdColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            widget.category!,
+                            style: TextStyle(
+                              color: AppColors.thirdColor,
+                              fontSize: isTablet ? 14 : 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Закругленный переход
+                Container(
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Контент
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 24 : 16,
+              vertical: isTablet ? 8 : 4,
+            ),
+            child: _buildContent(isTablet),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Построение контента для БД записей
+  Widget _buildContent(bool isTablet) {
+    if (widget.content.isEmpty) {
+      return const _CenteredInfo(
+        icon: Icons.description_outlined,
+        title: 'Контент недоступен',
+        subtitle: 'Содержимое отсутствует',
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isTablet ? 20 : 16),
+      margin: EdgeInsets.only(bottom: isTablet ? 24 : 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Заголовок "Содержание"
+          Row(
+            children: [
+              Icon(
+                Icons.article_outlined,
+                color: AppColors.primaryColor,
+                size: isTablet ? 24 : 20,
+              ),
+              SizedBox(width: isTablet ? 8 : 6),
+              Text(
+                'Содержание',
+                style: TextStyle(
+                  color: AppColors.primaryColor,
+                  fontSize: isTablet ? 18 : 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+
+          SizedBox(height: isTablet ? 16 : 12),
+
+          // Основной текст
+          Text(
+            widget.content,
+            style: TextStyle(
+              color: Colors.grey[800],
+              fontSize: isTablet ? 16 : 14,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+}
+
+// ---------------------------
+// Вспомогательные виджеты
+// ---------------------------
+
+class _CenteredInfo extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+
+  const _CenteredInfo({
+    Key? key,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isTablet = MediaQuery.of(context).size.width > 600;
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: isTablet ? 40 : 32),
+          Icon(
+            icon,
+            size: isTablet ? 64 : 48,
+            color: Colors.grey[400],
+          ),
+          SizedBox(height: isTablet ? 16 : 12),
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: isTablet ? 18 : 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (subtitle != null) ...[
+            SizedBox(height: isTablet ? 8 : 6),
+            Text(
+              subtitle!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: isTablet ? 14 : 12,
+              ),
+            ),
+          ],
+          SizedBox(height: isTablet ? 40 : 32),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorPanel extends StatelessWidget {
+  final String message;
+  const _ErrorPanel({Key? key, required this.message}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.06),
+          border: Border.all(color: Colors.red.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          message,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: Colors.red.shade800,
+            height: 1.4,
+          ),
+        ),
+      ),
     );
   }
 }

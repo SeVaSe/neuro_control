@@ -21,7 +21,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 5, // Увеличили версию для обновления таблицы напоминаний
+      version: 6, // Увеличили версию для обновления таблицы напоминаний
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -158,7 +158,10 @@ class AppDatabase {
         content TEXT NOT NULL,
         category TEXT,
         created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
+        updated_at INTEGER NOT NULL,
+        type TEXT DEFAULT 'database',
+        pdf_path TEXT,
+        is_pdf_loaded INTEGER DEFAULT 0
       )
     ''');
 
@@ -215,6 +218,7 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_reference_images_guide ON reference_guide_images(reference_guide_id)');
     await db.execute('CREATE INDEX idx_operation_manual_category ON operation_manual(category)');
     await db.execute('CREATE INDEX idx_operation_images_manual ON operation_manual_images(operation_manual_id)');
+    await db.execute('CREATE INDEX idx_reference_guide_type ON reference_guide(type)');
 
     // ОБНОВЛЕННЫЕ ИНДЕКСЫ для таблицы напоминаний
     await db.execute('CREATE INDEX idx_reminders_patient ON reminders(patient_id)');
@@ -303,7 +307,7 @@ class AppDatabase {
       await db.execute('CREATE INDEX idx_reminders_patient_datetime ON reminders(patient_id, reminder_date_time)');
     }
 
-    // НОВОЕ: Обновляем таблицу напоминаний в версии 5
+    // Обновляем таблицу напоминаний в версии 5
     if (oldVersion < 5) {
       await db.execute('ALTER TABLE reminders RENAME COLUMN reminder_date_time TO event_date_time;');
       await db.execute('ALTER TABLE reminders ADD COLUMN notify_month_before INTEGER;');
@@ -323,6 +327,18 @@ class AppDatabase {
       await db.execute('CREATE INDEX idx_reminders_notify_day ON reminders(notify_day_before);');
       await db.execute('CREATE INDEX idx_reminders_notify_hour ON reminders(notify_hour_before);');
     }
+
+    if (oldVersion < 6) {
+      // Добавляем новые поля для поддержки PDF
+      await db.execute('ALTER TABLE reference_guide ADD COLUMN type TEXT DEFAULT "database"');
+      await db.execute('ALTER TABLE reference_guide ADD COLUMN pdf_path TEXT');
+      await db.execute('ALTER TABLE reference_guide ADD COLUMN is_pdf_loaded INTEGER DEFAULT 0');
+
+      // Создаем индекс для типа
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_reference_guide_type ON reference_guide(type)');
+
+      await db.execute('UPDATE reference_guide SET type = "database" WHERE type IS NULL');
+    }
   }
 
   Future<void> _insertInitialReferenceGuides(Database db) async {
@@ -330,90 +346,55 @@ class AppDatabase {
 
     final guides = [
       {
-        'title': 'Что такое ДЦП?',
-        'content': 'Детский церебральный паралич — это группа двигательных нарушений...',
+        'title': 'Что такое сиалорея?',
+        'content': "Нужна информация",
         'category': 'Общие сведения',
+        'type': 'database',
+        'pdf_path': null,
+        'is_pdf_loaded': 0,
         'created_at': now,
         'updated_at': now,
       },
       {
-        'title': 'Методы реабилитации при ДЦП',
-        'content': 'Включают ЛФК, робототерапию, физиотерапию, и ортезирование.',
-        'category': 'Реабилитация',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Роль ортопедии в нейроразвитии',
-        'content': 'Ортопедические методы важны для контроля за формированием скелета и осанки.',
-        'category': 'Ортопедия',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Что такое ДЦП?',
-        'content': 'Детский церебральный паралич — это группа двигательных нарушений...',
+        'title': 'Что такое денситометрия?',
+        'content': 'Денситометрия — оценка минеральной плотности костной ткани, выполняемая методами лучевой диагностики. Основная цель процедуры — выявление снижения плотности кости (остеопороз), оценка риска осложнений и эффективности его лечения.\n\nСниженная минеральная плотность костной ткани (МПКТ) распространена у детей с тяжелой двигательной дисфункцией, особенно у детей с ДЦП IV-V уровня по GMFCS. Денситометрия остается предпочтительным методом клинической оценки плотности костей у детей из-за его широкой доступности, воспроизводимости и быстрого предоставления результатов, низкого воздействия ионизирующего излучения и наличия надежных педиатрических справочных данных. Корректировка результатов денситометрии на основе возраста костей у детей с ДЦП будет полезна для предотвращения гипердиагностики сниженной МПКТ.\n\nДетям с ДЦП выполняют денситометрию с 5 лет не чаще, чем раз в 2-3 года.',
         'category': 'Общие сведения',
+        'type': 'database',
+        'pdf_path': null,
+        'is_pdf_loaded': 0,
         'created_at': now,
         'updated_at': now,
       },
       {
-        'title': 'Методы реабилитации при ДЦП',
-        'content': 'Включают ЛФК, робототерапию, физиотерапию, и ортезирование.',
-        'category': 'Реабилитация',
+        'title': 'Что такое рентгенография?',
+        'content': '', // Пустой контент для PDF
+        'category': 'Общие сведения',
+        'type': 'pdf',
+        'pdf_path': "lib/assets/data/pdf/RENTGENpdf.pdf", // Путь будет установлен при добавлении реального PDF
+        'is_pdf_loaded': 1,
         'created_at': now,
         'updated_at': now,
       },
       {
-        'title': 'Роль ортопедии в нейроразвитии',
-        'content': 'Ортопедические методы важны для контроля за формированием скелета и осанки.',
-        'category': 'Ортопедия',
+        'title': 'Что такое GMFCS?',
+        'content': '',
+        'category': 'Общие сведения',
+        'type': 'pdf',
+        'pdf_path': "lib/assets/data/pdf/GMFCSpdf.pdf",
+        'is_pdf_loaded': 1,
         'created_at': now,
         'updated_at': now,
       },
       {
         'title': 'Что такое ДЦП?',
-        'content': 'Детский церебральный паралич — это группа двигательных нарушений...',
+        'content': '',
         'category': 'Общие сведения',
+        'type': 'pdf',
+        'pdf_path': "lib/assets/data/pdf/DCPpdf.pdf",
+        'is_pdf_loaded': 1,
         'created_at': now,
         'updated_at': now,
-      },
-      {
-        'title': 'Методы реабилитации при ДЦП',
-        'content': 'Включают ЛФК, робототерапию, физиотерапию, и ортезирование.',
-        'category': 'Реабилитация',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Роль ортопедии в нейроразвитии',
-        'content': 'Ортопедические методы важны для контроля за формированием скелета и осанки.',
-        'category': 'Ортопедия',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Что такое ДЦП?',
-        'content': 'Детский церебральный паралич — это группа двигательных нарушений...',
-        'category': 'Общие сведения',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Методы реабилитации при ДЦП',
-        'content': 'Включают ЛФК, робототерапию, физиотерапию, и ортезирование.',
-        'category': 'Реабилитация',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Роль ортопедии в нейроразвитии',
-        'content': 'Ортопедические методы важны для контроля за формированием скелета и осанки.',
-        'category': 'Ортопедия',
-        'created_at': now,
-        'updated_at': now,
-      },
-      // Добавь другие записи при необходимости
+      }
     ];
 
     final batch = db.batch();
