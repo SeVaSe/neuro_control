@@ -3,6 +3,7 @@ import 'package:add_2_calendar/add_2_calendar.dart';
 
 import '../../../services/database_service.dart';
 import '../../../services/reminder_scheduler.dart';
+import '../../screensTopic/topic_detail_manual.dart';
 
 class SalivationPage extends StatefulWidget {
   const SalivationPage({Key? key}) : super(key: key);
@@ -30,6 +31,7 @@ class _SalivationPageState extends State<SalivationPage> {
   final Color _blueColor = const Color(0xFF74B9FF);
   final Color _darkBlueColor = const Color(0xFF0984E3);
   final Color _yellowColor = const Color(0xFFFFC107);
+  static const Color primaryColor = Color(0xFF26A66C);
 
   // Вопросы теста
   final List<Map<String, String>> _questions = [
@@ -258,6 +260,48 @@ class _SalivationPageState extends State<SalivationPage> {
               }
             },
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(
+                Icons.help_outline,
+                color: Colors.white,
+                size: 24,
+              ),
+              onPressed: () async {
+                try {
+                  // Получаем запись по title через сервис
+                  final allGuides = await _databaseService.getAllReferenceGuides();
+                  final guide = allGuides.firstWhere(
+                        (g) => g.title == 'Что такое сиалорея?',
+                    orElse: () => throw Exception('Запись не найдена'),
+                  );
+
+                  // Переходим на экран с деталями
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TopicDetailScreen(
+                        title: guide.title,
+                        content: guide.content,
+                        category: guide.category,
+                        guideId: guide.id!,
+                        referenceType: guide.type,
+                        pdfPath: guide.pdfPath,
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  // Ошибка поиска
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Не удалось открыть справочник: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())

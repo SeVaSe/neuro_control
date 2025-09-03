@@ -11,6 +11,7 @@ import '../../../database/entities/orthopedic_examination.dart';
 import '../../../database/entities/photo_record.dart';
 import '../../../services/database_service.dart';
 import '../../../services/reminder_scheduler.dart';
+import '../../screensTopic/topic_detail_manual.dart';
 
 class OrtopedPage extends StatefulWidget {
   final String patientId;
@@ -581,18 +582,42 @@ class _OrtopedPageState extends State<OrtopedPage>
               color: Colors.white,
               size: 24,
             ),
-            onPressed: () {
-              // Заглушка - пока просто показываем снэкбар
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Справка ортопед'),
-                  backgroundColor: _primaryColor,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+            onPressed: () async {
+              try {
+                // Получаем запись по title через сервис
+                final allGuides = await _databaseService.getAllReferenceGuides();
+                final guide = allGuides.firstWhere(
+                      (g) => g.title == 'Что такое ДЦП?',
+                  orElse: () => throw Exception('Запись не найдена'),
+                );
+
+                // Переходим на экран с деталями
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TopicDetailScreen(
+                      title: guide.title,
+                      content: guide.content,
+                      category: guide.category,
+                      guideId: guide.id!,
+                      referenceType: guide.type,
+                      pdfPath: guide.pdfPath,
+                    ),
+                  ),
+                );
+              } catch (e) {
+                // Ошибка поиска
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Не удалось открыть справочник: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
           ),
         ],
+
 
       ),
       body: FadeTransition(

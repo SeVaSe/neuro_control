@@ -7,6 +7,7 @@ import 'package:open_file/open_file.dart';
 import '../../../database/entities/densitometry.dart';
 import '../../../database/entities/gmfcs.dart';
 import '../../../services/database_service.dart';
+import '../../screensTopic/topic_detail_manual.dart';
 
 class DensitometrPage extends StatefulWidget {
   final String patientId;
@@ -379,15 +380,38 @@ class _DensitometrPageState extends State<DensitometrPage>
               color: Colors.white,
               size: 24,
             ),
-            onPressed: () {
-              // Заглушка - пока просто показываем снэкбар
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Справка по денситометрии'),
-                  backgroundColor: primaryColor,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+            onPressed: () async {
+              try {
+                // Получаем запись по title через сервис
+                final allGuides = await _databaseService.getAllReferenceGuides();
+                final guide = allGuides.firstWhere(
+                      (g) => g.title == 'Что такое денситометрия?',
+                  orElse: () => throw Exception('Запись не найдена'),
+                );
+
+                // Переходим на экран с деталями
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TopicDetailScreen(
+                      title: guide.title,
+                      content: guide.content,
+                      category: guide.category,
+                      guideId: guide.id!,
+                      referenceType: guide.type,
+                      pdfPath: guide.pdfPath,
+                    ),
+                  ),
+                );
+              } catch (e) {
+                // Ошибка поиска
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Не удалось открыть справочник: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
           ),
         ],
