@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../assets/colors/app_colors.dart';
 import '../../../services/database_service.dart';
 import '../../../database/entities/reminder.dart';
 
@@ -9,8 +10,8 @@ class ReminderPage extends StatefulWidget {
 }
 
 class _ReminderPageState extends State<ReminderPage> with TickerProviderStateMixin {
-  static const Color primaryColor = Color(0xFF135A3E);
-  static const Color secondaryColor = Color(0xff12956f);
+  static const Color primaryColor = AppColors.primaryColor;
+  static const Color secondaryColor = AppColors.secondryColor;
   static const Color thirdColor = Colors.white;
   static const Color accentColor = Color(0xFF4CAF50);
 

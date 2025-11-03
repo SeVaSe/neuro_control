@@ -140,8 +140,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Widget _buildVideoPlayer(double screenWidth, double screenHeight) {
     if (!_isVideoInitialized) {
       return Container(
-        width: screenWidth * 0.9,
-        height: screenHeight * 0.25,
+        width: screenWidth * 0.95,
+        height: screenHeight * 0.35,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -149,19 +149,34 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               AppColors.primaryColor,
             ],
           ),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Загрузка видео...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
 
     final videoAspectRatio = _videoController.value.aspectRatio;
-    final containerWidth = screenWidth * 0.9;
-    final maxHeight = screenHeight * 0.3;
+    final containerWidth = screenWidth * 0.95;
+
+    // Увеличиваем максимальную высоту видео
+    final maxHeight = screenHeight * 0.45;
 
     double videoWidth = containerWidth;
     double videoHeight = videoWidth / videoAspectRatio;
@@ -175,17 +190,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       width: videoWidth,
       height: videoHeight,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryColor.withOpacity(0.2),
+            color: AppColors.primaryColor.withOpacity(0.3),
             blurRadius: 20,
             offset: Offset(0, 8),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
             Positioned.fill(child: VideoPlayer(_videoController)),
@@ -238,42 +253,44 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // Адаптивные размеры шрифтов
   double _getTitleFontSize(double screenWidth) {
-    if (screenWidth < 350) return screenWidth * 0.075;
-    if (screenWidth < 400) return screenWidth * 0.08;
-    if (screenWidth > 500) return screenWidth * 0.07;
-    return screenWidth * 0.08;
+    if (screenWidth < 350) return 24;
+    if (screenWidth < 400) return 28;
+    if (screenWidth > 500) return 32;
+    return 30;
   }
 
   double _getDescriptionFontSize(double screenWidth) {
-    if (screenWidth < 350) return screenWidth * 0.042;
-    if (screenWidth < 400) return screenWidth * 0.048;
-    if (screenWidth > 500) return screenWidth * 0.042;
-    return screenWidth * 0.05;
+    if (screenWidth < 350) return 14;
+    if (screenWidth < 400) return 16;
+    if (screenWidth > 500) return 18;
+    return 16;
   }
 
   double _getCallToActionFontSize(double screenWidth) {
-    if (screenWidth < 350) return screenWidth * 0.044;
-    if (screenWidth < 400) return screenWidth * 0.048;
-    if (screenWidth > 500) return screenWidth * 0.042;
-    return screenWidth * 0.05;
+    if (screenWidth < 350) return 15;
+    if (screenWidth < 400) return 17;
+    if (screenWidth > 500) return 19;
+    return 17;
   }
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenHeight < 700;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: screenWidth * 0.06,
-            vertical: screenHeight * 0.02,
-          ),
-          child: Column(
-            children: [
-              Expanded(
+        child: Column(
+          children: [
+            // Прокручиваемый контент
+            Expanded(
+              child: SingleChildScrollView(
+                physics: BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth * 0.05,
+                  vertical: 20,
+                ),
                 child: AnimatedBuilder(
                   animation: _animationController,
                   builder: (context, child) => FadeTransition(
@@ -281,11 +298,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     child: SlideTransition(
                       position: _slideAnimation,
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          // Видео плеер
                           _buildVideoPlayer(screenWidth, screenHeight),
 
-                          SizedBox(height: isSmallScreen ? screenHeight * 0.03 : screenHeight * 0.04),
+                          SizedBox(height: 30),
 
                           // Заголовок "Добро пожаловать!"
                           Text(
@@ -299,11 +316,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             textAlign: TextAlign.center,
                           ),
 
-                          SizedBox(height: isSmallScreen ? screenHeight * 0.02 : screenHeight * 0.025),
+                          SizedBox(height: 20),
 
                           // Основное описание приложения
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
+                            padding: EdgeInsets.symmetric(horizontal: 10),
                             child: Text(
                               'Данное приложение поможет вам, уважаемые родители, контролировать посещения врачей, вовремя проходить обследования вашего ребенка и избежать ряда рисков, связанных с опорно-двигательным аппаратом.',
                               style: TextStyle(
@@ -316,11 +333,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             ),
                           ),
 
-                          SizedBox(height: isSmallScreen ? screenHeight * 0.02 : screenHeight * 0.025),
+                          SizedBox(height: 20),
 
                           // Призыв к действию
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
+                            padding: EdgeInsets.symmetric(horizontal: 10),
                             child: Text(
                               'Давайте начнем настройку приложения специально для вас.',
                               style: TextStyle(
@@ -333,23 +350,37 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               textAlign: TextAlign.center,
                             ),
                           ),
+
+                          SizedBox(height: 40),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
+            ),
 
-              SizedBox(height: screenHeight * 0.02),
-
-              // Кнопка "Начать настройку"
-              Container(
+            // Фиксированная кнопка внизу
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                screenWidth * 0.05,
+                20,
+                screenWidth * 0.05,
+                20 + bottomPadding,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Container(
                 width: double.infinity,
-                height: screenHeight * 0.07,
-                constraints: BoxConstraints(
-                  minHeight: 50,
-                  maxHeight: isSmallScreen ? 65 : 75,
-                ),
+                height: 56,
                 decoration: BoxDecoration(
                   gradient: AppColors.primaryGradient,
                   borderRadius: BorderRadius.circular(28),
@@ -374,7 +405,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             'Начать настройку',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: screenWidth * 0.045,
+                              fontSize: 18,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.5,
                             ),
@@ -383,7 +414,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           Icon(
                             Icons.arrow_forward,
                             color: Colors.white,
-                            size: screenWidth * 0.05,
+                            size: 20,
                           ),
                         ],
                       ),
@@ -391,8 +422,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

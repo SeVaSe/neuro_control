@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Основные цвета
-  static const Color primaryColor = Color(0xFF135A3E); // глубокий синий
-  static const Color secondryColor = Color(0xff12956f); // яркий синий
+  static const Color primaryColor = Color(0xFF158f1a); // глубокий синий
+  static const Color secondryColor = Color(0xff45b54b); // яркий синий
+  // static const Color primaryColor = Color(0xFF135A3E); // глубокий синий
+  // static const Color secondryColor = Color(0xff12956f); // яркий синий
   static const Color thirdColor = Colors.white; // белый
 
   // Цвета текстов

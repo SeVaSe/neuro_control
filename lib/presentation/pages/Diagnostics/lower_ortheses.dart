@@ -13,7 +13,7 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
   List<Orthosis> orthoses = [];
   bool isLoading = true;
   String searchQuery = '';
-  String timeFilter = 'Все'; // Все, Дневной, Ночной
+  String timeFilter = 'Все'; // Все, Дневной, Ночной, Дневной/Ночной
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -47,7 +47,7 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
               .toList();
           isLoading = false;
         });
-        print('Количество загруженных ортезов: ${orthoses.length}'); // Для отладки
+        print('Количество загруженных ортезов: ${orthoses.length}');
       } else {
         throw Exception('Неверная структура JSON файла');
       }
@@ -56,7 +56,6 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
       setState(() {
         isLoading = false;
       });
-
     }
   }
 
@@ -65,7 +64,9 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
 
     // Фильтр по времени использования
     if (timeFilter != 'Все') {
-      filtered = filtered.where((orthosis) => orthosis.timeType == timeFilter).toList();
+      filtered = filtered
+          .where((orthosis) => orthosis.timeType == timeFilter)
+          .toList();
     }
 
     // Фильтр по поиску
@@ -73,7 +74,9 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
       filtered = filtered
           .where((orthosis) =>
       orthosis.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          orthosis.description.toLowerCase().contains(searchQuery.toLowerCase()))
+          orthosis.description
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase()))
           .toList();
     }
 
@@ -143,7 +146,8 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
                 )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
           ),
@@ -165,7 +169,8 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: ['Все', 'Дневной', 'Ночной'].map((filter) {
+                      children: ['Все', 'Дневной', 'Ночной', 'Дневной/Ночной']
+                          .map((filter) {
                         final isSelected = timeFilter == filter;
                         return Container(
                           margin: const EdgeInsets.only(right: 8),
@@ -180,11 +185,17 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
                             selectedColor: primaryColor.withOpacity(0.2),
                             checkmarkColor: secondaryColor,
                             labelStyle: TextStyle(
-                              color: isSelected ? secondaryColor : Colors.grey[600],
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              color: isSelected
+                                  ? secondaryColor
+                                  : Colors.grey[600],
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
                             ),
                             side: BorderSide(
-                              color: isSelected ? secondaryColor : Colors.grey[300]!,
+                              color: isSelected
+                                  ? secondaryColor
+                                  : Colors.grey[300]!,
                             ),
                           ),
                         );
@@ -199,7 +210,8 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
           // Results counter
           if (searchQuery.isNotEmpty || timeFilter != 'Все')
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
                   Icon(
@@ -293,18 +305,21 @@ class _LowerOrthosesPageState extends State<LowerOrthosesPage> {
               color: secondaryColor,
               child: GridView.builder(
                 padding: const EdgeInsets.all(16),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate:
+                SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: isTablet ? 0.85 : 0.75,
+                  childAspectRatio:
+                  isTablet ? 0.85 : 0.75,
                 ),
                 itemCount: filteredOrthoses.length,
                 itemBuilder: (context, index) {
                   final orthosis = filteredOrthoses[index];
                   return OrthosisCard(
                     orthosis: orthosis,
-                    onTap: () => _showOrthosisDetails(context, orthosis),
+                    onTap: () =>
+                        _showOrthosisDetails(context, orthosis),
                   );
                 },
               ),
@@ -340,6 +355,23 @@ class OrthosisCard extends StatelessWidget {
     const primaryColor = Color(0xFFF3C643);
     const secondaryColor = Color(0xFFF1B102);
 
+    Color badgeColor;
+    IconData badgeIcon;
+
+    switch (orthosis.timeType) {
+      case 'Ночной':
+        badgeColor = Colors.indigo.withOpacity(0.9);
+        badgeIcon = Icons.nightlight_round;
+        break;
+      case 'Дневной/Ночной':
+        badgeColor = Colors.teal.withOpacity(0.9);
+        badgeIcon = Icons.brightness_4;
+        break;
+      default:
+        badgeColor = Colors.orange.withOpacity(0.9);
+        badgeIcon = Icons.wb_sunny;
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -357,25 +389,22 @@ class OrthosisCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image container with time type badge
             Stack(
               children: [
                 Container(
                   height: 180,
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                    gradient: LinearGradient(
-                      colors: [primaryColor, secondaryColor],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(16)),
+                    color: Colors.grey,
                   ),
                   child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16)),
                     child: Image.asset(
                       orthosis.imagePath,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain, // Изменено с cover на contain
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           decoration: const BoxDecoration(
@@ -397,25 +426,21 @@ class OrthosisCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Time type badge
                 Positioned(
                   top: 12,
                   right: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: orthosis.timeType == 'Ночной'
-                          ? Colors.indigo.withOpacity(0.9)
-                          : Colors.orange.withOpacity(0.9),
+                      color: badgeColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          orthosis.timeType == 'Ночной'
-                              ? Icons.nightlight_round
-                              : Icons.wb_sunny,
+                          badgeIcon,
                           size: 12,
                           color: Colors.white,
                         ),
@@ -434,7 +459,6 @@ class OrthosisCard extends StatelessWidget {
                 ),
               ],
             ),
-            // Content
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -467,9 +491,7 @@ class OrthosisCard extends StatelessWidget {
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: secondaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -477,7 +499,7 @@ class OrthosisCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.access_time,
                             size: 14,
                             color: secondaryColor,
@@ -511,12 +533,30 @@ class OrthosisCard extends StatelessWidget {
 class OrthosisDetailModal extends StatelessWidget {
   final Orthosis orthosis;
 
-  const OrthosisDetailModal({Key? key, required this.orthosis}) : super(key: key);
+  const OrthosisDetailModal({Key? key, required this.orthosis})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFFF3C643);
     const secondaryColor = Color(0xFFF1B102);
+
+    Color badgeColor;
+    IconData badgeIcon;
+
+    switch (orthosis.timeType) {
+      case 'Ночной':
+        badgeColor = Colors.indigo.withOpacity(0.9);
+        badgeIcon = Icons.nightlight_round;
+        break;
+      case 'Дневной/Ночной':
+        badgeColor = Colors.teal.withOpacity(0.9);
+        badgeIcon = Icons.brightness_4;
+        break;
+      default:
+        badgeColor = Colors.orange.withOpacity(0.9);
+        badgeIcon = Icons.wb_sunny;
+    }
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -530,7 +570,6 @@ class OrthosisDetailModal extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Handle
               Container(
                 width: 40,
                 height: 4,
@@ -547,56 +586,56 @@ class OrthosisDetailModal extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Image with time badge
                       Stack(
                         children: [
                           Container(
-                            height: 250,
+                            height: 300, // Увеличена высота
                             width: double.infinity,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
-                              gradient: const LinearGradient(
-                                colors: [primaryColor, secondaryColor],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                              color: Colors.grey[100], // Добавлен фон
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
                               child: Image.asset(
                                 orthosis.imagePath,
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain, // Изменено с cover на contain
                                 errorBuilder: (context, error, stackTrace) {
-                                  return const Center(
-                                    child: Icon(
-                                      Icons.medical_services,
-                                      size: 64,
-                                      color: Colors.white,
+                                  return Container(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [primaryColor, secondaryColor],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.medical_services,
+                                        size: 64,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   );
                                 },
                               ),
                             ),
                           ),
-                          // Time type badge
                           Positioned(
                             top: 16,
                             right: 16,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                color: orthosis.timeType == 'Ночной'
-                                    ? Colors.indigo.withOpacity(0.9)
-                                    : Colors.orange.withOpacity(0.9),
+                                color: badgeColor,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    orthosis.timeType == 'Ночной'
-                                        ? Icons.nightlight_round
-                                        : Icons.wb_sunny,
+                                    badgeIcon,
                                     size: 16,
                                     color: Colors.white,
                                   ),
@@ -616,7 +655,6 @@ class OrthosisDetailModal extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      // Title
                       Text(
                         orthosis.name,
                         style: const TextStyle(
@@ -626,7 +664,6 @@ class OrthosisDetailModal extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Description
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -637,7 +674,7 @@ class OrthosisDetailModal extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Описание',
+                              'Функция',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -657,7 +694,6 @@ class OrthosisDetailModal extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Wearing mode
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -674,7 +710,8 @@ class OrthosisDetailModal extends StatelessWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                CrossAxisAlignment.start,
                                 children: [
                                   const Text(
                                     'Режим ношения',

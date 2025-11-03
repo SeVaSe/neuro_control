@@ -107,14 +107,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     ),
                   ),
                   SizedBox(height: 50),
-                  Text(
-                    AppStrings.nameAppString,
-                    style: TextStyle(
-                      color: AppColors.thirdColor,
-                      fontSize: screenWidth * 0.10,
-                      fontFamily: 'TinosBold',
-                      fontWeight: FontWeight.w800,
-                    ),
+                  buildAppNameLogo(
+                    fontSize: screenWidth * 0.090,
+                    fontFamily: 'TinosBold',
                   ),
                   SizedBox(height: 10),
                   LayoutBuilder(

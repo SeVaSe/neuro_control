@@ -11,6 +11,8 @@ import '../../../database/entities/xray_image.dart';
 import '../../../services/database_service.dart';
 import '../../../services/reminder_scheduler.dart';
 import '../../screensTopic/topic_detail_manual.dart';
+import 'package:neuro_control/assets/colors/app_colors.dart';
+
 
 class RentgenPage extends StatefulWidget {
   final String patientId;
@@ -657,7 +659,7 @@ class _RentgenPageState extends State<RentgenPage>
             children: [
               Icon(
                 Icons.info_outline,
-                color: _primaryColor,
+                color: AppColors.errorColor,
                 size: 24,
               ),
               const SizedBox(width: 8),
@@ -666,7 +668,7 @@ class _RentgenPageState extends State<RentgenPage>
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: _primaryColor,
+                  color: AppColors.errorColor,
                 ),
               ),
             ],
@@ -743,7 +745,7 @@ class _RentgenPageState extends State<RentgenPage>
               // Получаем запись по title через сервис
               final allGuides = await _databaseService.getAllReferenceGuides();
               final guide = allGuides.firstWhere(
-                    (g) => g.title == 'Что такое рентгенография?',
+                    (g) => g.title == 'Укладка ребенка при рентгенографии ТБС',
                 orElse: () => throw Exception('Запись не найдена'),
               );
 
@@ -1078,7 +1080,7 @@ class _XraySchedulePage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              color: Color(0xFFFF974D),
+              color: Color(0xFF1565C0),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
@@ -1086,7 +1088,7 @@ class _XraySchedulePage extends StatelessWidget {
             ),
             child: const Center(
               child: Text(
-                'График рентгенографии ТБС',
+                'График рентген ТБС по GMFCS',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -1112,13 +1114,13 @@ class _XraySchedulePage extends StatelessWidget {
               _buildTableDataRow('3', [false, false, true, true, true]),
               _buildTableDataRow('3,5', [false, false, false, true, true]),
               _buildTableDataRow('4', [false, false, true, true, true]),
-              _buildTableDataRow('5', [false, true, true, true, true]),
+              _buildTableDataRow('5', [false, false, true, true, true]),
               _buildTableDataRow('6', [false, true, true, true, true]),
               _buildTableDataRow('7', [false, false, true, true, true]),
               _buildTableDataRow('8', [false, false, true, true, true]),
-              _buildTableDataRow('9', [false, true, true, true, true]),
+              _buildTableDataRow('9', [false, false, false, true, true]),
               _buildTableDataRow('10', [false, true, true, true, true]),
-              _buildTableDataRow('11', [false, false, true, true, true]),
+              _buildTableDataRow('11', [false, false, false, true, true]),
               _buildTableDataRow('12-16', [false, false, true, true, true], hasSpecialText: true),
             ],
           ),
@@ -1129,14 +1131,14 @@ class _XraySchedulePage extends StatelessWidget {
 
   TableRow _buildTableHeaderRow() {
     return TableRow(
-      decoration: const BoxDecoration(color: Color(0xFFFF974D)),
+      decoration: const BoxDecoration(color: Color(0xFF42A5F5)),
       children: [
         _buildHeaderCell('Возраст'),
-        _buildHeaderCell('GMFCS 1'),
-        _buildHeaderCell('GMFCS 2'),
-        _buildHeaderCell('GMFCS 3'),
-        _buildHeaderCell('GMFCS 4'),
-        _buildHeaderCell('GMFCS 5'),
+        _buildHeaderCell('I'),
+        _buildHeaderCell('II'),
+        _buildHeaderCell('III'),
+        _buildHeaderCell('IV'),
+        _buildHeaderCell('V'),
       ],
     );
   }
@@ -1171,7 +1173,7 @@ class _XraySchedulePage extends StatelessWidget {
           height: 60,
           padding: const EdgeInsets.all(12),
           decoration: const BoxDecoration(
-            color: Color(0xFFFF974D),
+            color: Color(0xFF42A5F5),
           ),
           child: Center(
             child: Text(

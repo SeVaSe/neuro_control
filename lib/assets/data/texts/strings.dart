@@ -1,6 +1,11 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+import '../../colors/app_colors.dart';
+
 class AppStrings {
   //INTERFACE
-  static const String nameAppString = 'NeuroOrto.control';
+  static const String nameAppString = 'NeuroOrto.CONTROL';
   static const String versionString = 'Версия: 0.23.17';
 
   //all
@@ -27,8 +32,112 @@ class AppStrings {
 
   //tree
   static const String buttonTreeString = 'Дерево диагностики';
+
+
+
 }
 
+Widget buildAppName({
+  double fontSize = 24,
+  String fontFamily = 'TinosBold',
+}) {
+  return RichText(
+    textAlign: TextAlign.center,
+    text: TextSpan(
+      style: TextStyle(
+        fontSize: fontSize,
+        fontFamily: fontFamily,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.5,
+      ),
+      children: [
+        TextSpan(
+          text: 'NeuroOrto.',
+          style: TextStyle(color: AppColors.secondryColor),
+        ),
+        TextSpan(
+          text: 'C',
+          style: TextStyle(color: Colors.red),
+        ),
+        TextSpan(
+          text: 'O',
+          style: TextStyle(color: Colors.orange),
+        ),
+        TextSpan(
+          text: 'N',
+          style: TextStyle(color: Colors.yellow),
+        ),
+        TextSpan(
+          text: 'T',
+          style: TextStyle(color: Colors.green),
+        ),
+        TextSpan(
+          text: 'R',
+          style: TextStyle(color: Colors.blue),
+        ),
+        TextSpan(
+          text: 'O',
+          style: TextStyle(color: Colors.indigo),
+        ),
+        TextSpan(
+          text: 'L',
+          style: TextStyle(color: Colors.purple),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget buildAppNameLogo({
+  double fontSize = 24,
+  String fontFamily = 'TinosBold',
+}) {
+  return RichText(
+    textAlign: TextAlign.center,
+    text: TextSpan(
+      style: TextStyle(
+        fontSize: fontSize,
+        fontFamily: fontFamily,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.5,
+      ),
+      children: [
+        TextSpan(
+          text: 'NeuroOrto.',
+          style: TextStyle(color: Colors.white),
+        ),
+        TextSpan(
+          text: 'C',
+          style: TextStyle(color: Colors.red),
+        ),
+        TextSpan(
+          text: 'O',
+          style: TextStyle(color: Colors.orange),
+        ),
+        TextSpan(
+          text: 'N',
+          style: TextStyle(color: Colors.yellow),
+        ),
+        TextSpan(
+          text: 'T',
+          style: TextStyle(color: Colors.green),
+        ),
+        TextSpan(
+          text: 'R',
+          style: TextStyle(color: Colors.blue),
+        ),
+        TextSpan(
+          text: 'O',
+          style: TextStyle(color: Colors.indigo),
+        ),
+        TextSpan(
+          text: 'L',
+          style: TextStyle(color: Colors.purple),
+        ),
+      ],
+    ),
+  );
+}
 
 class AppStrongStrings {
   //3diag

@@ -363,15 +363,9 @@ class _AboutProgramState extends State<AboutProgram> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Название программы
-              Text(
-                AppStrings.nameAppString,
-                textAlign: TextAlign.left,
-                style: TextStyle(
-                  color: AppColors.secondryColor, // Цвет текста
-                  fontSize: isTablet ? 36.0 : 28.0, // Адаптивный размер шрифта
-                  fontFamily: 'TinosBold',
-                  fontWeight: FontWeight.w800,
-                ),
+              buildAppName(
+                fontSize: screenWidth * 0.075,
+                fontFamily: 'TinosBold',
               ),
               SizedBox(height: isTablet ? 8 : 4),
 

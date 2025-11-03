@@ -63,14 +63,9 @@ class _DownloadPageState extends State<DownloadPage> {
                     ),
                   ),
                   SizedBox(height: 50),
-                  Text(
-                    AppStrings.nameAppString,
-                    style: TextStyle(
-                      color: AppColors.thirdColor,
-                      fontSize: screenWidth * 0.10, // Адаптируемый размер шрифта
-                      fontFamily: 'TinosBold',
-                      fontWeight: FontWeight.w800,
-                    ),
+                  buildAppNameLogo(
+                    fontSize: screenWidth * 0.090,
+                    fontFamily: 'TinosBold',
                   ),
                   SizedBox(height: 10),
                   LayoutBuilder(
@@ -78,7 +73,7 @@ class _DownloadPageState extends State<DownloadPage> {
                       // Measure the text width
                       final textPainter = TextPainter(
                         text: TextSpan(
-                          text: 'NeuroOrto.Pro',
+                          text: 'NeuroOrto.Control',
                           style: TextStyle(
                             color: AppColors.thirdColor,
                             fontSize: 31.44,

@@ -11,14 +11,6 @@ class VideoHelloPage extends StatefulWidget {
 }
 
 class _VideoHelloPageState extends State<VideoHelloPage> {
-  // Цвета
-  // static const Color primaryColor = Color(0xFF0A3D91);
-  // static const Color secondaryColor = Color(0xFF1565C0);
-  // static const Color thirdColor = Colors.white;
-  // static const Color mainTitleColor = secondaryColor;
-  // static const Color text1Color = Color(0xFF1E88E5);
-  // static const Color text2Color = Color(0xFF0D47A1);
-
   late VideoPlayerController _controller;
   bool _isLoading = true;
   bool _hasError = false;
@@ -28,7 +20,25 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
   @override
   void initState() {
     super.initState();
+    // Блокируем поворот экрана - только портретная ориентация
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     _initializeVideo();
+  }
+
+  @override
+  void dispose() {
+    // Восстанавливаем все ориентации при выходе со страницы
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    _controller.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeVideo() async {
@@ -91,12 +101,6 @@ class _VideoHelloPageState extends State<VideoHelloPage> {
     String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
     String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
     return '$twoDigitMinutes:$twoDigitSeconds';
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 
   @override

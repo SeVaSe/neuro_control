@@ -723,16 +723,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           top: screenHeight * 0.02,
                           bottom: screenHeight * 0.04,
                         ),
-                        child: Text(
-                          AppStrings.nameAppString,
-                          style: TextStyle(
-                            color: AppColors.secondryColor,
-                            fontFamily: 'TinosBold',
-                            fontSize: screenWidth * 0.075,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                          textAlign: TextAlign.center,
+                        child: buildAppName(
+                          fontSize: screenWidth * 0.075,
+                          fontFamily: 'TinosBold',
                         ),
                       ),
 

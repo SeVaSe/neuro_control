@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:neuro_control/assets/colors/app_colors.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file/open_file.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
@@ -658,7 +659,7 @@ class _OrtopedPageState extends State<OrtopedPage>
             children: [
               Icon(
                 Icons.info_outline,
-                color: _primaryColor,
+                color: AppColors.errorColor,
                 size: 24,
               ),
               const SizedBox(width: 8),
@@ -667,7 +668,7 @@ class _OrtopedPageState extends State<OrtopedPage>
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: _primaryColor,
+                  color: AppColors.errorColor,
                 ),
               ),
             ],
@@ -985,7 +986,8 @@ class _ExaminationSchedulePage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              color: Color(0xFF66BB6A),
+              color: Color(0xFF1565C0),
+              //color: Color(0xFF66BB6A),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
@@ -993,7 +995,7 @@ class _ExaminationSchedulePage extends StatelessWidget {
             ),
             child: const Center(
               child: Text(
-                'График осмотров',
+                'График осмотров по GMFCS',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -1014,19 +1016,19 @@ class _ExaminationSchedulePage extends StatelessWidget {
             },
             children: [
               _buildTableHeaderRow(),
-              _buildTableDataRow('2', [true, true, true, true, true]),
-              _buildTableDataRow('2,5', [false, false, false, true, true]),
-              _buildTableDataRow('3', [false, false, true, true, true]),
-              _buildTableDataRow('3,5', [false, false, false, true, true]),
-              _buildTableDataRow('4', [true, true, true, true, true]),
-              _buildTableDataRow('5', [false, false, true, true, true]),
-              _buildTableDataRow('6', [true, true, true, true, true]),
-              _buildTableDataRow('7', [false, false, true, true, true]),
-              _buildTableDataRow('8', [false, true, true, true, true]),
-              _buildTableDataRow('9', [false, false, true, true, true]),
-              _buildTableDataRow('10', [false, true, true, true, true]),
-              _buildTableDataRow('11', [false, false, true, true, true]),
-              _buildTableDataRow('12-16', [false, false, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('2', [true, true, true, true, true], hasSpecialText: true),
+              //_buildTableDataRow('2,5', [false, true, false, true, true]),
+              _buildTableDataRow('3', [true, true, true, true, true], hasSpecialText: true),
+              //_buildTableDataRow('3,5', [false, true, false, true, true]),
+              _buildTableDataRow('4', [true, true, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('5', [true, true, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('6', [true, true, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('7', [true, true, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('8', [true, true, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('9', [true, true, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('10', [true, true, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('11', [true, true, true, true, true], hasSpecialText: true),
+              _buildTableDataRow('12-16', [true, true, true, true, true], hasSpecialText: true),
             ],
           ),
         ],
@@ -1036,14 +1038,14 @@ class _ExaminationSchedulePage extends StatelessWidget {
 
   TableRow _buildTableHeaderRow() {
     return TableRow(
-      decoration: const BoxDecoration(color: Color(0xFF66BB6A)),
+      decoration: const BoxDecoration(color: Color(0xFF42A5F5)),
       children: [
         _buildHeaderCell('Возраст'),
-        _buildHeaderCell('GMFCS 1'),
-        _buildHeaderCell('GMFCS 2'),
-        _buildHeaderCell('GMFCS 3'),
-        _buildHeaderCell('GMFCS 4'),
-        _buildHeaderCell('GMFCS 5'),
+        _buildHeaderCell('I'),
+        _buildHeaderCell('II'),
+        _buildHeaderCell('III'),
+        _buildHeaderCell('IV'),
+        _buildHeaderCell('V'),
       ],
     );
   }
@@ -1078,7 +1080,7 @@ class _ExaminationSchedulePage extends StatelessWidget {
           height: 60,
           padding: const EdgeInsets.all(12),
           decoration: const BoxDecoration(
-            color: Color(0xFF66BB6A),
+            color: Color(0xFF42A5F5),
           ),
           child: Center(
             child: Text(
@@ -1200,30 +1202,16 @@ class _ExaminationSchedulePage extends StatelessWidget {
     bool needsVisit = false;
     bool needsTwiceAYear = false;
 
-    // Логика определения необходимости посещения на основе возраста и GMFCS
-    if (patientAge! <= 2) {
-      needsVisit = true; // Все уровни GMFCS
-    } else if (patientAge == 3 && gmfcsLevel! >= 3) {
+    // Упрощенная логика:
+    // GMFCS 1-2: один раз в год для всех возрастов
+    // GMFCS 3-5: два раза в год для всех возрастов
+
+    if (gmfcsLevel! >= 1 && gmfcsLevel! <= 2) {
       needsVisit = true;
-    } else if (patientAge == 4) {
-      needsVisit = true; // Все уровни GMFCS
-    } else if (patientAge == 5 && gmfcsLevel! >= 3) {
+      needsTwiceAYear = false; // один раз в год
+    } else if (gmfcsLevel! >= 3 && gmfcsLevel! <= 5) {
       needsVisit = true;
-    } else if (patientAge == 6) {
-      needsVisit = true; // Все уровни GMFCS
-    } else if (patientAge == 7 && gmfcsLevel! >= 3) {
-      needsVisit = true;
-    } else if (patientAge == 8 && gmfcsLevel! >= 2) {
-      needsVisit = true;
-    } else if (patientAge == 9 && gmfcsLevel! >= 3) {
-      needsVisit = true;
-    } else if (patientAge == 10 && gmfcsLevel! >= 2) {
-      needsVisit = true;
-    } else if (patientAge == 11 && gmfcsLevel! >= 3) {
-      needsVisit = true;
-    } else if (patientAge! >= 12 && patientAge! <= 16 && gmfcsLevel! >= 3) {
-      needsVisit = true;
-      needsTwiceAYear = true;
+      needsTwiceAYear = true; // два раза в год
     }
 
     if (!needsVisit) {
@@ -1231,7 +1219,7 @@ class _ExaminationSchedulePage extends StatelessWidget {
     }
 
     if (needsTwiceAYear) {
-      return 'Рекомендуется посещать ортопеда не менее ДВУХ РАЗ В ГОД. Возраст ребенка: $patientAge лет, уровень GMFCS: $gmfcsLevel. Регулярные осмотры особенно важны в подростковом возрасте для контроля прогрессирования деформаций.';
+      return 'Рекомендуется посещать ортопеда не менее ДВУХ РАЗ В ГОД. Возраст ребенка: $patientAge лет, уровень GMFCS: $gmfcsLevel. Регулярные осмотры особенно важны для контроля прогрессирования деформаций.';
     }
 
     return 'Рекомендуется посещать ортопеда НЕ МЕНЕЕ ОДНОГО РАЗА В ГОД. Возраст ребенка: $patientAge лет, уровень GMFCS: $gmfcsLevel. Регулярные осмотры помогают своевременно выявить и предотвратить развитие ортопедических осложнений.';
