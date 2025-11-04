@@ -88,6 +88,7 @@ flutter:
     - lib/assets/data/pdf/
     - lib/assets/data/texts/
     - lib/assets/videos/
+    - lib/assets/imgs/manuals/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

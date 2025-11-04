@@ -419,99 +419,99 @@ class AppDatabase {
   Future<void> _insertInitialInstructions(Database db) async {
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    final guides = [
-      {
-        'title': 'Домашнее окно',
-        'description': 'В главном окне у нас есть...',
-        'category': 'Главное',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Раздел "О программе"',
-        'description': 'Можно узнать все о...',
-        'category': 'Разделы',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Раздел "Справочник"',
-        'description': 'Узнайте о медицинских патологиях больше...',
-        'category': 'Разделы',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Домашнее окно',
-        'description': 'В главном окне у нас есть...',
-        'category': 'Главное',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Раздел "О программе"',
-        'description': 'Можно узнать все о...',
-        'category': 'Разделы',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Раздел "Справочник"',
-        'description': 'Узнайте о медицинских патологиях больше...',
-        'category': 'Разделы',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Домашнее окно',
-        'description': 'В главном окне у нас есть...',
-        'category': 'Главное',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Раздел "О программе"',
-        'description': 'Можно узнать все о...',
-        'category': 'Разделы',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Раздел "Справочник"',
-        'description': 'Узнайте о медицинских патологиях больше...',
-        'category': 'Разделы',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Домашнее окно',
-        'description': 'В главном окне у нас есть...',
-        'category': 'Главное',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Раздел "О программе"',
-        'description': 'Можно узнать все о...',
-        'category': 'Разделы',
-        'created_at': now,
-        'updated_at': now,
-      },
-      {
-        'title': 'Раздел "Справочник"',
-        'description': 'Узнайте о медицинских патологиях больше...',
-        'category': 'Разделы',
-        'created_at': now,
-        'updated_at': now,
-      },
-      // Добавь другие записи при необходимости
-    ];
+    // final guides = [
+    //   {
+    //     'title': 'Домашнее окно',
+    //     'description': 'В главном окне у нас есть...',
+    //     'category': 'Главное',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Раздел "О программе"',
+    //     'description': 'Можно узнать все о...',
+    //     'category': 'Разделы',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Раздел "Справочник"',
+    //     'description': 'Узнайте о медицинских патологиях больше...',
+    //     'category': 'Разделы',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Домашнее окно',
+    //     'description': 'В главном окне у нас есть...',
+    //     'category': 'Главное',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Раздел "О программе"',
+    //     'description': 'Можно узнать все о...',
+    //     'category': 'Разделы',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Раздел "Справочник"',
+    //     'description': 'Узнайте о медицинских патологиях больше...',
+    //     'category': 'Разделы',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Домашнее окно',
+    //     'description': 'В главном окне у нас есть...',
+    //     'category': 'Главное',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Раздел "О программе"',
+    //     'description': 'Можно узнать все о...',
+    //     'category': 'Разделы',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Раздел "Справочник"',
+    //     'description': 'Узнайте о медицинских патологиях больше...',
+    //     'category': 'Разделы',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Домашнее окно',
+    //     'description': 'В главном окне у нас есть...',
+    //     'category': 'Главное',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Раздел "О программе"',
+    //     'description': 'Можно узнать все о...',
+    //     'category': 'Разделы',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   {
+    //     'title': 'Раздел "Справочник"',
+    //     'description': 'Узнайте о медицинских патологиях больше...',
+    //     'category': 'Разделы',
+    //     'created_at': now,
+    //     'updated_at': now,
+    //   },
+    //   // Добавь другие записи при необходимости
+    // ];
 
     final batch = db.batch();
 
-    for (final guide in guides) {
-      batch.insert('operation_manual', guide);
-    }
+    // for (final guide in guides) {
+    //   batch.insert('operation_manual', guide);
+    // }
 
     await batch.commit(noResult: true);
   }

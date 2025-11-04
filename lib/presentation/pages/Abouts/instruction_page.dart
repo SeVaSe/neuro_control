@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Добавлен для SystemUiOverlayStyle
+import 'package:flutter/services.dart';
 import '../../../assets/data/texts/strings.dart';
 import '../../screensTopic/topic_detail_instruction.dart';
-import '../../../services/database_service.dart';
-import '../../../database/entities/operation_manual.dart';
+import '../../../services/manual_service.dart';
+import '../../../models/operation_manual_model.dart';
 import '../../../assets/colors/app_colors.dart';
 
 class OperationManualScreen extends StatefulWidget {
@@ -14,11 +14,11 @@ class OperationManualScreen extends StatefulWidget {
 }
 
 class _OperationManualScreenState extends State<OperationManualScreen> {
-  final DatabaseService _databaseService = DatabaseService();
-  final ScrollController _scrollController = ScrollController(); // Добавлен ScrollController
+  final ManualService _manualService = ManualService();
+  final ScrollController _scrollController = ScrollController();
 
-  List<OperationManual> allManuals = []; // Все инструкции по эксплуатации
-  List<OperationManual> filteredManuals = []; // Отфильтрованные инструкции для поиска
+  List<OperationManualModel> allManuals = [];
+  List<OperationManualModel> filteredManuals = [];
   final TextEditingController searchController = TextEditingController();
 
   bool isLoading = true;
@@ -31,7 +31,7 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
     searchController.addListener(_filterManuals);
   }
 
-  /// Загрузка инструкций по эксплуатации из базы данных
+  /// Загрузка инструкций из JSON
   Future<void> _loadManuals() async {
     try {
       setState(() {
@@ -39,7 +39,7 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
         errorMessage = null;
       });
 
-      final manuals = await _databaseService.getAllOperationManuals();
+      final manuals = await _manualService.getAllManuals();
 
       setState(() {
         allManuals = manuals;
@@ -55,7 +55,7 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
     }
   }
 
-  /// Фильтрация инструкций по названию
+  /// Фильтрация инструкций по названию или категории
   void _filterManuals() {
     final query = searchController.text.toLowerCase().trim();
 
@@ -66,7 +66,8 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
         filteredManuals = allManuals
             .where((manual) =>
         manual.title.toLowerCase().contains(query) ||
-            (manual.category?.toLowerCase().contains(query) ?? false))
+            manual.category.toLowerCase().contains(query) ||
+            manual.shortDescription.toLowerCase().contains(query))
             .toList();
       }
     });
@@ -74,19 +75,17 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
 
   /// Обновление списка (pull-to-refresh)
   Future<void> _refreshManuals() async {
+    _manualService.clearCache();
     await _loadManuals();
   }
 
   /// Переход к детальному просмотру инструкции
-  void _navigateToDetail(OperationManual manual) {
+  void _navigateToDetail(OperationManualModel manual) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => TopicDetailOperationScreen(
-          title: manual.title,
-          description: manual.description,
-          category: manual.category,
-          manualId: manual.id!,
+          manual: manual,
         ),
       ),
     );
@@ -98,27 +97,27 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
     final isTablet = screenSize.width > 600;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Установлен цвет фона
+      backgroundColor: const Color(0xFFF8F9FA),
       body: NestedScrollView(
-        controller: _scrollController, // Присвоен ScrollController
+        controller: _scrollController,
         headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
           return [
             SliverAppBar(
               backgroundColor: AppColors.primaryColor,
               iconTheme: const IconThemeData(color: AppColors.thirdColor),
               title: const Text(
-                AppStrings.buttonOsnAboutString, // Использован ваш строковый ресурс
+                AppStrings.buttonOsnAboutString,
                 style: TextStyle(
                   fontFamily: 'TinosBold',
                   fontWeight: FontWeight.bold,
                   color: AppColors.thirdColor,
                 ),
               ),
-              elevation: 0, // Установлен elevation в 0 для соответствия
+              elevation: 0,
               pinned: true,
               floating: false,
               snap: false,
-              expandedHeight: 130, // Установлена высота для соответствия
+              expandedHeight: 130,
               systemOverlayStyle: const SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
                 statusBarIconBrightness: Brightness.light,
@@ -133,7 +132,6 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
                         alignment: Alignment.bottomLeft,
                         child: Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-
                         ),
                       ),
                     ),
@@ -141,7 +139,7 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
                 ),
               ),
               bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(0), // Для скругленного угла
+                preferredSize: const Size.fromHeight(0),
                 child: Container(
                   height: 32,
                   decoration: const BoxDecoration(
@@ -340,7 +338,7 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
     );
   }
 
-  Widget _buildManualCard(OperationManual manual, bool isTablet) {
+  Widget _buildManualCard(OperationManualModel manual, bool isTablet) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: isTablet ? 10 : 8),
       child: Material(
@@ -373,8 +371,8 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
 
-                  // Категория (если есть)
-                  if (manual.category != null && manual.category!.isNotEmpty) ...[
+                  // Категория
+                  if (manual.category.isNotEmpty) ...[
                     SizedBox(height: isTablet ? 8 : 6),
                     Container(
                       padding: EdgeInsets.symmetric(
@@ -386,13 +384,28 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        manual.category!,
+                        manual.category,
                         style: TextStyle(
                           color: AppColors.thirdColor,
                           fontSize: isTablet ? 12 : 11,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                    ),
+                  ],
+
+                  // Краткое описание
+                  if (manual.shortDescription.isNotEmpty) ...[
+                    SizedBox(height: isTablet ? 8 : 6),
+                    Text(
+                      manual.shortDescription,
+                      style: TextStyle(
+                        color: AppColors.thirdColor.withOpacity(0.9),
+                        fontSize: isTablet ? 14 : 13,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
 
@@ -419,7 +432,7 @@ class _OperationManualScreenState extends State<OperationManualScreen> {
 
   @override
   void dispose() {
-    _scrollController.dispose(); // Не забудьте удалить ScrollController
+    _scrollController.dispose();
     searchController.dispose();
     super.dispose();
   }
