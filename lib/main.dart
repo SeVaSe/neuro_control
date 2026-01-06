@@ -19,13 +19,20 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      builder: (context, child) {
+        return SafeArea(
+          bottom: true,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
-        Locale('ru'), // Русский язык
+        Locale('ru'),
       ],
       home: SplashScreen(),
       theme: ThemeData(
@@ -35,6 +42,7 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
 
 class SplashScreen extends StatefulWidget {
   @override
