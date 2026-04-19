@@ -145,7 +145,7 @@ class _InstructionScreenState extends State<InstructionScreen> {
                 const SizedBox(height: 20),
                 Text(
                   'Перед началом работы с приложением обязательно ознакомьтесь '
-                      'с инструкцией по использованию NeuroOrto.control',
+                      'с инструкцией по использованию НейроОрто.контроль',
                   style: TextStyle(
                     fontSize: 18,
                     color: AppColors.text2Color,

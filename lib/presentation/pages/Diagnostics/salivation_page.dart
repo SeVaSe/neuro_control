@@ -146,7 +146,7 @@ class _SalivationPageState extends State<SalivationPage> {
         patientId: patientId,
         appointmentDateTime: _nextTestDate!,
         title: 'Пройти Анкету по слюнотечению',
-        description: 'У вас скоро запланировано прохождение Акеты по слюнотечению. Не забудьте провести данное обследование в приложении NeuroOrto.control!',
+        description: 'У вас скоро запланировано прохождение Акеты по слюнотечению. Не забудьте провести данное обследование в приложении НейроОрто.контроль!',
       );
 
       // Обновляем список записей

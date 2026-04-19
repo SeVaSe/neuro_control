@@ -73,7 +73,7 @@ class _DownloadPageState extends State<DownloadPage> {
                       // Measure the text width
                       final textPainter = TextPainter(
                         text: TextSpan(
-                          text: 'NeuroOrto.Control',
+                          text: 'НейроОрто.контроль',
                           style: TextStyle(
                             color: AppColors.thirdColor,
                             fontSize: 31.44,

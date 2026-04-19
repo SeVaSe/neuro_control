@@ -125,7 +125,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       // Measure the text width
                       final textPainter = TextPainter(
                         text: TextSpan(
-                          text: 'NeuroOrto.control',
+                          text: 'НейроОрто.контроль',
                           style: TextStyle(
                             color: AppColors.thirdColor,
                             fontSize: 31.44,

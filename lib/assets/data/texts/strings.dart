@@ -5,7 +5,7 @@ import '../../colors/app_colors.dart';
 
 class AppStrings {
   //INTERFACE
-  static const String nameAppString = 'NeuroOrto.CONTROL';
+  static const String nameAppString = 'НейроОрто.контроль';
   static const String versionString = 'Версия: 0.23.17';
 
   //all
@@ -28,7 +28,7 @@ class AppStrings {
   static const String buttonOptionsAboutString = 'Настройки';
   static const String buttonVideoAboutString = 'Видео приветствие';
   static const String buttonStorageAboutString = 'Хранилище';
-  static const String textDecriptionAboutString = 'NeuroOrto.control — умное приложение, созданное для поддержки родителей детей с ДЦП в повседневной жизни и процессе реабилитации. Оно помогает наблюдать за состоянием ребёнка, хранить медицинские документы и рентгены, получать справочную информацию, фиксировать развитие моторики и не забывать о приёмах и процедурах. Всё это делает заботу более осознанной и уверенной';
+  static const String textDecriptionAboutString = 'НейроОрто.контроль — умное приложение, созданное для поддержки родителей детей с ДЦП в повседневной жизни и процессе реабилитации. Оно помогает наблюдать за состоянием ребёнка, хранить медицинские документы и рентгены, получать справочную информацию, фиксировать развитие моторики и не забывать о приёмах и процедурах. Всё это делает заботу более осознанной и уверенной';
 
   //tree
   static const String buttonTreeString = 'Дерево диагностики';
@@ -52,36 +52,40 @@ Widget buildAppName({
       ),
       children: [
         TextSpan(
-          text: 'NeuroOrto.',
+          text: 'НейроОрто.',
           style: TextStyle(color: AppColors.secondryColor),
         ),
         TextSpan(
-          text: 'C',
+          text: 'К',
           style: TextStyle(color: Colors.red),
         ),
         TextSpan(
-          text: 'O',
+          text: 'О',
           style: TextStyle(color: Colors.orange),
         ),
         TextSpan(
-          text: 'N',
+          text: 'Н',
           style: TextStyle(color: Colors.yellow),
         ),
         TextSpan(
-          text: 'T',
+          text: 'Т',
           style: TextStyle(color: Colors.green),
         ),
         TextSpan(
-          text: 'R',
+          text: 'Р',
           style: TextStyle(color: Colors.blue),
         ),
         TextSpan(
-          text: 'O',
+          text: 'О',
           style: TextStyle(color: Colors.indigo),
         ),
         TextSpan(
-          text: 'L',
+          text: 'Л',
           style: TextStyle(color: Colors.purple),
+        ),
+        TextSpan(
+          text: 'Ь',
+            style: TextStyle(color: Color(0xFFE300E7)),
         ),
       ],
     ),
@@ -103,36 +107,40 @@ Widget buildAppNameLogo({
       ),
       children: [
         TextSpan(
-          text: 'NeuroOrto.',
+          text: 'НейроОрто.',
           style: TextStyle(color: Colors.white),
         ),
         TextSpan(
-          text: 'C',
+          text: 'К',
           style: TextStyle(color: Colors.red),
         ),
         TextSpan(
-          text: 'O',
+          text: 'О',
           style: TextStyle(color: Colors.orange),
         ),
         TextSpan(
-          text: 'N',
+          text: 'Н',
           style: TextStyle(color: Colors.yellow),
         ),
         TextSpan(
-          text: 'T',
+          text: 'Т',
           style: TextStyle(color: Colors.green),
         ),
         TextSpan(
-          text: 'R',
+          text: 'Р',
           style: TextStyle(color: Colors.blue),
         ),
         TextSpan(
-          text: 'O',
+          text: 'О',
           style: TextStyle(color: Colors.indigo),
         ),
         TextSpan(
-          text: 'L',
+          text: 'Л',
           style: TextStyle(color: Colors.purple),
+        ),
+        TextSpan(
+          text: 'Ь',
+          style: TextStyle(color: Color(0xFFE300E7)),
         ),
       ],
     ),
